@@ -6,6 +6,7 @@ import AudioRecorder from "@/components/AudioRecorder";
 import { Story, StoryCategory, PublishGate } from "@/lib/types";
 import { saveStory } from "@/lib/store";
 import { uploadAudioToR2 } from "@/lib/upload";
+import { getConnectedWallet } from "@/lib/wallet";
 import { ArrowLeft, DollarSign, Users, Loader2 } from "lucide-react";
 import Link from "next/link";
 
@@ -71,6 +72,7 @@ export default function RecordPage() {
       createdAt: Date.now(),
       // pay gate goes straight to tokenize; evaluate gate waits for 3 reviews
       status: gate === "pay" ? "listed" : "pending_eval",
+      authorWallet: getConnectedWallet() ?? undefined,
     };
 
     saveStory(story);

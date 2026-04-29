@@ -20,8 +20,11 @@
     "clsx": "^2.1.1",
     "lucide-react": "^1.11.0",
     "next": "^16.2.4",
+    "node-fetch": "^3.3.2",
     "react": "^19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tr46": "^6.0.0",
+    "whatwg-url": "^16.0.1"
   },
   "devDependencies": {
     "@codama/nodes-from-anchor": "^1.4.1",

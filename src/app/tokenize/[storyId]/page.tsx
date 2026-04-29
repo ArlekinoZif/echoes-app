@@ -27,7 +27,7 @@ const RPC_URL =
 type Step =
   | "wallet"    // connect Phantom
   | "details"   // ticker + cover image
-  | "pay"       // $1 ECHOES listing fee
+  | "pay"       // $1 ECHOES listing fee (author-only)
   | "upload"    // Arweave audio upload
   | "launch"    // Bags token creation + fee-share
   | "done";
@@ -39,19 +39,21 @@ interface StepState {
   detail?: string;
 }
 
-const STEP_META: { id: Step; label: string; icon: React.ReactNode }[] = [
+const ALL_STEP_META: { id: Step; label: string; icon: React.ReactNode; authorOnly?: boolean }[] = [
   { id: "wallet", label: "Connect wallet", icon: <Wallet className="w-4 h-4" /> },
   { id: "details", label: "Token details", icon: <ImageIcon className="w-4 h-4" /> },
-  { id: "pay", label: "Pay listing fee ($1 ECHOES)", icon: <DollarSign className="w-4 h-4" /> },
+  { id: "pay", label: "Pay listing fee ($1 ECHOES)", icon: <DollarSign className="w-4 h-4" />, authorOnly: true },
   { id: "upload", label: "Upload to Arweave", icon: <Upload className="w-4 h-4" /> },
   { id: "launch", label: "Launch on Bags App", icon: <Zap className="w-4 h-4" /> },
   { id: "done", label: "Done!", icon: <CheckCircle className="w-4 h-4" /> },
 ];
 
-const STEPS = STEP_META.map((s) => s.id);
+// Will be filtered at runtime based on isSponsor
+const STEPS_AUTHOR: Step[] = ALL_STEP_META.map((s) => s.id);
+const STEPS_SPONSOR: Step[] = ALL_STEP_META.filter((s) => !s.authorOnly).map((s) => s.id);
 
 function initStates(): Record<Step, StepState> {
-  return Object.fromEntries(STEPS.map((s) => [s, { status: "idle" }])) as Record<
+  return Object.fromEntries(STEPS_AUTHOR.map((s) => [s, { status: "idle" }])) as Record<
     Step,
     StepState
   >;
@@ -64,6 +66,13 @@ export default function TokenizePage({
 }) {
   const { storyId } = use(params);
   const router = useRouter();
+
+  // Detect sponsor mode from URL (?sponsor=1)
+  const [isSponsor, setIsSponsor] = useState(false);
+  useEffect(() => {
+    const p = new URLSearchParams(window.location.search);
+    setIsSponsor(p.get("sponsor") === "1");
+  }, []);
 
   const [story, setStory] = useState<Story | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>("wallet");
@@ -133,7 +142,13 @@ export default function TokenizePage({
     e.preventDefault();
     if (!ticker.trim()) return;
     setStep("details", { status: "done", detail: ticker.toUpperCase() });
-    setCurrentStep("pay");
+    if (isSponsor) {
+      // Sponsors skip the $1 ECHOES listing fee — story is already listed
+      setCurrentStep("upload");
+      handleArweaveUpload();
+    } else {
+      setCurrentStep("pay");
+    }
   }
 
   async function handlePayFee() {
@@ -206,14 +221,15 @@ export default function TokenizePage({
       await signAndSendAllBase64Txs(launchTxs, RPC_URL);
       const resolvedMint: string = mint || tokenInfoId; // fallback if mint not yet returned
 
-      // 5. Get fee-share transactions (server-side)
+      // 5. Get fee-share transactions (server-side) — fee split depends on launch type
       const feeRes = await fetch("/api/bags/fee-share-txs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           mint: resolvedMint,
-          launchType: "author",
-          authorWallet: walletAddress,
+          launchType: isSponsor ? "sponsor" : "author",
+          authorWallet: isSponsor ? (story.authorWallet ?? walletAddress) : walletAddress,
+          sponsorWallet: isSponsor ? walletAddress : undefined,
         }),
       });
       if (!feeRes.ok) throw new Error((await feeRes.json()).error ?? "Fee-share failed");
@@ -235,8 +251,9 @@ export default function TokenizePage({
         ticker: ticker.toUpperCase(),
         tokenMint: resolvedMint,
         tokenListingUrl: listingUrl,
-        launchType: "author",
-        authorWallet: walletAddress,
+        launchType: isSponsor ? "sponsor" : "author",
+        authorWallet: isSponsor ? (story.authorWallet ?? walletAddress) : walletAddress,
+        sponsorWallet: isSponsor ? walletAddress : undefined,
         arweaveCid: arwaveAudioUrl,
         listingTxSig,
       };
@@ -268,6 +285,8 @@ export default function TokenizePage({
 
   if (!story) return null;
 
+  const STEP_META = ALL_STEP_META.filter((s) => !s.authorOnly || !isSponsor);
+  const STEPS = isSponsor ? STEPS_SPONSOR : STEPS_AUTHOR;
   const stepIdx = STEPS.indexOf(currentStep);
 
   return (
@@ -282,10 +301,17 @@ export default function TokenizePage({
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Tokenize story</h1>
+            <h1 className="text-2xl font-bold">
+              {isSponsor ? "Sponsor & tokenize" : "Tokenize story"}
+            </h1>
             <p className="text-sm text-neutral-500 truncate max-w-xs">
               {story.title}
             </p>
+            {isSponsor && (
+              <p className="text-xs text-emerald-400 mt-0.5">
+                You earn 50% of trading volume forever
+              </p>
+            )}
           </div>
         </div>
 
@@ -499,8 +525,10 @@ export default function TokenizePage({
             <CheckCircle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
             <h2 className="text-lg font-bold mb-1">Your story is live! 🎉</h2>
             <p className="text-sm text-neutral-400 mb-5">
-              Preserved forever on Arweave. Trading on Bags App now.
-              You earn 75% of all trading volume.
+              Preserved forever on Arweave. Trading on Bags App now.{" "}
+              {isSponsor
+                ? "You earn 50% of all trading volume as the sponsor."
+                : "You earn 75% of all trading volume."}
             </p>
             <div className="flex flex-col gap-2">
               {arweaveUrl && (
