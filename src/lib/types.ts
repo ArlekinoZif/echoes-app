@@ -9,6 +9,12 @@ export type StoryCategory =
 
 export type PublishGate = "pay" | "evaluate";
 
+/** draft → pending_eval → listed → tokenized */
+export type StoryStatus = "draft" | "pending_eval" | "listed" | "tokenized";
+
+/** Who launched the token on Bags App */
+export type LaunchType = "author" | "sponsor";
+
 export interface Story {
   id: string;
   title: string;
@@ -18,7 +24,19 @@ export interface Story {
   durationSeconds: number;
   publishGate: PublishGate;
   createdAt: number;
-  status: "draft" | "pending_eval" | "tokenized";
+  status: StoryStatus;
+  authorWallet?: string;
+
+  // Set after listing (pay gate completes)
+  listingTxSig?: string;
+
+  // Set after tokenization
+  ticker?: string;
+  tokenMint?: string;
+  tokenListingUrl?: string;
+  launchType?: LaunchType;
+  sponsorWallet?: string;
+  arweaveCid?: string;
 }
 
 export interface EvaluationCriteria {

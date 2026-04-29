@@ -69,7 +69,8 @@ export default function RecordPage() {
       durationSeconds: audioDuration,
       publishGate: gate,
       createdAt: Date.now(),
-      status: "pending_eval",
+      // pay gate goes straight to tokenize; evaluate gate waits for 3 reviews
+      status: gate === "pay" ? "listed" : "pending_eval",
     };
 
     saveStory(story);
@@ -77,6 +78,7 @@ export default function RecordPage() {
     if (gate === "evaluate") {
       router.push("/evaluate");
     } else {
+      // tokenize page handles $ECHOES listing fee + Arweave + Bags launch
       router.push(`/tokenize/${story.id}`);
     }
   };
@@ -215,10 +217,11 @@ export default function RecordPage() {
                     <DollarSign className="w-5 h-5 text-amber-400" />
                   </div>
                   <div>
-                    <p className="font-semibold">Pay to tokenize now</p>
+                    <p className="font-semibold">Pay to list &amp; tokenize</p>
                     <p className="text-sm text-neutral-400 mt-1">
-                      ~0.2 SOL (~$18) — permanent on Arweave, listed on Bags
-                      App immediately. You earn 80% of trading volume.
+                      $1 in $ECHOES tokens — your story is listed immediately,
+                      uploaded to Arweave forever, and launched on Bags App.
+                      You earn 75% of all trading volume.
                     </p>
                   </div>
                 </div>
@@ -241,7 +244,7 @@ export default function RecordPage() {
                     <p className="font-semibold">Evaluate 3 stories instead</p>
                     <p className="text-sm text-neutral-400 mt-1">
                       Listen to 80% of 3 stories and rate them. Free — your
-                      story enters the weekly SKR vote pool.
+                      story gets listed and enters the weekly vote pool.
                     </p>
                   </div>
                 </div>
