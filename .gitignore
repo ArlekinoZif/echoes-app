@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Rust / Anchor build artifacts
+target/
+.anchor/
+
+# Solana keypairs (never commit these)
+test-wallet.json
+deploy-keypair.json
+
+# Auto-generated Codama / Kinobi client code (regenerate from IDL)
+src/generated/

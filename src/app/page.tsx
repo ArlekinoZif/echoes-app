@@ -1,65 +1,119 @@
-import Image from "next/image";
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { getStories } from "@/lib/store";
+import { Story } from "@/lib/types";
+import { Mic, Clock, CheckCircle, Radio, Trophy, BarChart3 } from "lucide-react";
 
 export default function Home() {
+  const [stories, setStories] = useState<Story[]>([]);
+
+  useEffect(() => {
+    setStories(getStories().sort((a, b) => b.createdAt - a.createdAt));
+  }, []);
+
+  const fmt = (s: number) => `${Math.floor(s / 60)}m ${s % 60}s`;
+
+  const statusIcon = (status: Story["status"]) => {
+    if (status === "tokenized") return <CheckCircle className="w-4 h-4 text-amber-400" />;
+    if (status === "pending_eval") return <Clock className="w-4 h-4 text-neutral-500" />;
+    return <Radio className="w-4 h-4 text-neutral-600" />;
+  };
+
+  const statusLabel = (status: Story["status"]) => {
+    if (status === "tokenized") return "Tokenized";
+    if (status === "pending_eval") return "In evaluation pool";
+    return "Draft";
+  };
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+    <div className="min-h-screen bg-neutral-950 text-white">
+      <div className="max-w-xl mx-auto px-4 py-10">
+        {/* Logo */}
+        <div className="mb-10">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 flex items-center justify-center">
+              <Mic className="w-5 h-5 text-black" />
+            </div>
+            <span className="text-2xl font-bold tracking-tight">Echoes</span>
+          </div>
+          <p className="text-neutral-500 text-sm">
+            Preserve human experiences on-chain. Record → tokenize forever on
+            Arweave → trade on Bags.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+
+        {/* CTAs */}
+        <div className="flex flex-col gap-3 mb-10">
+          <Link
+            href="/record"
+            className="flex items-center justify-center gap-2 w-full py-4 bg-amber-500 hover:bg-amber-400 text-black rounded-2xl font-semibold text-lg transition-colors"
           >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
+            <Mic className="w-5 h-5" />
+            Record your story
+          </Link>
+          <Link
+            href="/vote"
+            className="flex items-center justify-center gap-2 w-full py-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white rounded-2xl font-semibold transition-colors"
           >
-            Documentation
-          </a>
+            <Trophy className="w-5 h-5 text-amber-400" />
+            Weekly SKR vote pool
+          </Link>
+          <Link
+            href="/dashboard"
+            className="flex items-center justify-center gap-2 w-full py-3 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 text-white rounded-2xl font-semibold transition-colors"
+          >
+            <BarChart3 className="w-5 h-5 text-blue-400" />
+            Author dashboard
+          </Link>
         </div>
-      </main>
+
+        {/* Stories list */}
+        {stories.length > 0 ? (
+          <div>
+            <h2 className="text-sm font-medium text-neutral-500 uppercase tracking-wider mb-4">
+              Your stories
+            </h2>
+            <div className="flex flex-col gap-3">
+              {stories.map((story) => (
+                <div
+                  key={story.id}
+                  className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="text-xs text-amber-500 font-medium bg-amber-500/10 px-2 py-0.5 rounded-full">
+                          {story.category}
+                        </span>
+                        <span className="text-xs text-neutral-600">
+                          {fmt(story.durationSeconds)}
+                        </span>
+                      </div>
+                      <p className="font-semibold truncate">{story.title}</p>
+                      <p className="text-sm text-neutral-500 mt-1 line-clamp-2">
+                        {story.description}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      {statusIcon(story.status)}
+                      <span className="text-xs text-neutral-600">
+                        {statusLabel(story.status)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="text-center py-16 text-neutral-600">
+            <Mic className="w-10 h-10 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">No stories yet. Record your first one.</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

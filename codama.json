@@ -1,0 +1,10 @@
+{
+  "idl": "src/idl/echoes_voting.json",
+  "before": [],
+  "scripts": {
+    "js": {
+      "from": "@codama/renderers-js",
+      "args": ["src/generated/echoes-voting"]
+    }
+  }
+}
