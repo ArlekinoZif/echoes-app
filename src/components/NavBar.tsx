@@ -11,7 +11,7 @@ const NAV = [
 ] as const;
 
 /** Hide the nav bar on deep flow pages */
-const HIDDEN_ON = ["/record", "/evaluate/", "/tokenize/", "/vote"];
+const HIDDEN_ON = ["/record", "/evaluate/", "/tokenize/", "/list/", "/vote"];
 
 export default function NavBar() {
   const pathname = usePathname();

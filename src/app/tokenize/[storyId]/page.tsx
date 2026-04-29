@@ -8,30 +8,27 @@ import { getStory, saveStory } from "@/lib/store";
 import { Story } from "@/lib/types";
 import { connectWallet, getConnectedWallet, signAndSendAllBase64Txs } from "@/lib/wallet";
 import { uploadToArweave } from "@/lib/arweave";
-import { payListingFee } from "@/lib/echoes-payment";
 import {
-  ArrowLeft,
-  Wallet,
-  Upload,
-  Zap,
-  CheckCircle,
-  ExternalLink,
-  Loader2,
-  ImageIcon,
-  DollarSign,
+  ArrowLeft, Wallet, Upload, Zap, CheckCircle, ExternalLink,
+  Loader2, ImageIcon,
 } from "lucide-react";
 
 const RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
+  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
 
-type Step =
-  | "wallet"    // connect Phantom
-  | "details"   // ticker + cover image
-  | "pay"       // $1 ECHOES listing fee (author-only)
-  | "upload"    // Arweave audio upload
-  | "launch"    // Bags token creation + fee-share
-  | "done";
+/**
+ * Tokenize page — Arweave upload + Bags App token launch.
+ *
+ * This is a SEPARATE action from listing. The story must already be listed
+ * (status === "listed" or "pending_eval") before tokenizing. The listing fee
+ * ($1 ECHOES) is handled on the /list/[storyId] page.
+ *
+ * Launch types:
+ *   author  → author earns 0.75% of trading volume (75% of the 1% Bags fee)
+ *   sponsor → sponsor earns 0.50%, author 0.25%, platform 0.25%
+ */
 
+type Step = "wallet" | "details" | "upload" | "launch" | "done";
 type StepStatus = "idle" | "loading" | "done" | "error";
 
 interface StepState {
@@ -39,24 +36,31 @@ interface StepState {
   detail?: string;
 }
 
-const ALL_STEP_META: { id: Step; label: string; icon: React.ReactNode; authorOnly?: boolean }[] = [
+const STEP_META: { id: Step; label: string; icon: React.ReactNode }[] = [
   { id: "wallet", label: "Connect wallet", icon: <Wallet className="w-4 h-4" /> },
   { id: "details", label: "Token details", icon: <ImageIcon className="w-4 h-4" /> },
-  { id: "pay", label: "Pay listing fee ($1 ECHOES)", icon: <DollarSign className="w-4 h-4" />, authorOnly: true },
   { id: "upload", label: "Upload to Arweave", icon: <Upload className="w-4 h-4" /> },
   { id: "launch", label: "Launch on Bags App", icon: <Zap className="w-4 h-4" /> },
   { id: "done", label: "Done!", icon: <CheckCircle className="w-4 h-4" /> },
 ];
 
-// Will be filtered at runtime based on isSponsor
-const STEPS_AUTHOR: Step[] = ALL_STEP_META.map((s) => s.id);
-const STEPS_SPONSOR: Step[] = ALL_STEP_META.filter((s) => !s.authorOnly).map((s) => s.id);
+const STEPS: Step[] = STEP_META.map((s) => s.id);
 
 function initStates(): Record<Step, StepState> {
-  return Object.fromEntries(STEPS_AUTHOR.map((s) => [s, { status: "idle" }])) as Record<
-    Step,
-    StepState
-  >;
+  return Object.fromEntries(STEPS.map((s) => [s, { status: "idle" }])) as Record<Step, StepState>;
+}
+
+function toMsg(e: unknown) {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (ev) => resolve(ev.target?.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function TokenizePage({
@@ -67,7 +71,7 @@ export default function TokenizePage({
   const { storyId } = use(params);
   const router = useRouter();
 
-  // Detect sponsor mode from URL (?sponsor=1)
+  // Sponsor mode: ?sponsor=1 in the URL
   const [isSponsor, setIsSponsor] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
@@ -79,23 +83,21 @@ export default function TokenizePage({
   const [stepStates, setStepStates] = useState<Record<Step, StepState>>(initStates());
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // Details form state
+  // Details form
   const [ticker, setTicker] = useState("");
   const [coverImage, setCoverImage] = useState<File | null>(null);
-  const [coverPreview, setCoverPreview] = useState<string>("");
+  const [coverPreview, setCoverPreview] = useState("");
 
   // Results
   const [arweaveUrl, setArweaveUrl] = useState("");
   const [tokenMint, setTokenMint] = useState("");
   const [bagsUrl, setBagsUrl] = useState("");
-  const [listingTxSig, setListingTxSig] = useState("");
 
   const audioBlobRef = useRef<Blob | null>(null);
 
   const setStep = useCallback((step: Step, state: StepState) =>
     setStepStates((prev) => ({ ...prev, [step]: state })), []);
 
-  // Load story + prefetch audio
   useEffect(() => {
     const s = getStory(storyId);
     if (!s) { router.push("/"); return; }
@@ -106,7 +108,6 @@ export default function TokenizePage({
       .then((b) => { audioBlobRef.current = b; })
       .catch(console.warn);
 
-    // Auto-connect if already connected
     const addr = getConnectedWallet();
     if (addr) {
       setWalletAddress(addr);
@@ -115,7 +116,7 @@ export default function TokenizePage({
     }
   }, [storyId, router, setStep]);
 
-  // ── Step handlers ─────────────────────────────────────────────────────────
+  // ── Handlers ──────────────────────────────────────────────────────────────
 
   async function handleConnectWallet() {
     setStep("wallet", { status: "loading" });
@@ -142,27 +143,8 @@ export default function TokenizePage({
     e.preventDefault();
     if (!ticker.trim()) return;
     setStep("details", { status: "done", detail: ticker.toUpperCase() });
-    if (isSponsor) {
-      // Sponsors skip the $1 ECHOES listing fee — story is already listed
-      setCurrentStep("upload");
-      handleArweaveUpload();
-    } else {
-      setCurrentStep("pay");
-    }
-  }
-
-  async function handlePayFee() {
-    if (!walletAddress) return;
-    setStep("pay", { status: "loading" });
-    try {
-      const sig = await payListingFee(walletAddress, RPC_URL);
-      setListingTxSig(sig);
-      setStep("pay", { status: "done", detail: sig.slice(0, 8) + "…" });
-      setCurrentStep("upload");
-      await handleArweaveUpload();
-    } catch (e: unknown) {
-      setStep("pay", { status: "error", detail: toMsg(e) });
-    }
+    setCurrentStep("upload");
+    handleArweaveUpload();
   }
 
   async function handleArweaveUpload() {
@@ -183,15 +165,13 @@ export default function TokenizePage({
     }
   }
 
-  async function handleBagsLaunch(arwaveAudioUrl: string) {
+  async function handleBagsLaunch(arweaveAudioUrl: string) {
     if (!story || !walletAddress) return;
     setStep("launch", { status: "loading" });
     try {
-      // 1. Prepare cover image (base64 or skip)
+      // 1. Cover image (optional)
       let imageBase64: string | undefined;
-      if (coverImage) {
-        imageBase64 = await fileToBase64(coverImage);
-      }
+      if (coverImage) imageBase64 = await fileToBase64(coverImage);
 
       // 2. Create token info (server-side)
       const infoRes = await fetch("/api/bags/info", {
@@ -202,13 +182,13 @@ export default function TokenizePage({
           symbol: ticker.toUpperCase(),
           description: story.description,
           imageBase64,
-          arweaveUrl: arwaveAudioUrl,
+          arweaveUrl: arweaveAudioUrl,
         }),
       });
       if (!infoRes.ok) throw new Error((await infoRes.json()).error ?? "Token info failed");
       const { tokenInfoId } = await infoRes.json();
 
-      // 3. Get launch transactions (server-side)
+      // 3. Get unsigned launch transactions (server-side)
       const launchRes = await fetch("/api/bags/launch-txs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -217,11 +197,11 @@ export default function TokenizePage({
       if (!launchRes.ok) throw new Error((await launchRes.json()).error ?? "Launch failed");
       const { transactions: launchTxs, mint } = await launchRes.json();
 
-      // 4. Sign + send launch transactions (client-side, Phantom)
+      // 4. Phantom signs + sends
       await signAndSendAllBase64Txs(launchTxs, RPC_URL);
-      const resolvedMint: string = mint || tokenInfoId; // fallback if mint not yet returned
+      const resolvedMint: string = mint || tokenInfoId;
 
-      // 5. Get fee-share transactions (server-side) — fee split depends on launch type
+      // 5. Fee-share config (50/25/25 for sponsor, 75/25 for author)
       const feeRes = await fetch("/api/bags/fee-share-txs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -234,13 +214,9 @@ export default function TokenizePage({
       });
       if (!feeRes.ok) throw new Error((await feeRes.json()).error ?? "Fee-share failed");
       const { transactions: feeTxs } = await feeRes.json();
+      if (feeTxs?.length) await signAndSendAllBase64Txs(feeTxs, RPC_URL);
 
-      // 6. Sign + send fee-share transactions
-      if (feeTxs?.length) {
-        await signAndSendAllBase64Txs(feeTxs, RPC_URL);
-      }
-
-      // 7. Persist updated story
+      // 6. Persist
       const listingUrl = `https://bags.fm/token/${resolvedMint}?ref=sirhitalk`;
       setBagsUrl(listingUrl);
       setTokenMint(resolvedMint);
@@ -254,8 +230,7 @@ export default function TokenizePage({
         launchType: isSponsor ? "sponsor" : "author",
         authorWallet: isSponsor ? (story.authorWallet ?? walletAddress) : walletAddress,
         sponsorWallet: isSponsor ? walletAddress : undefined,
-        arweaveCid: arwaveAudioUrl,
-        listingTxSig,
+        arweaveCid: arweaveAudioUrl,
       };
       saveStory(updated);
       setStory(updated);
@@ -268,50 +243,29 @@ export default function TokenizePage({
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
-  function toMsg(e: unknown) {
-    return e instanceof Error ? e.message : String(e);
-  }
-
-  function fileToBase64(file: File): Promise<string> {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = (ev) => resolve(ev.target?.result as string);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-  }
-
   if (!story) return null;
 
-  const STEP_META = ALL_STEP_META.filter((s) => !s.authorOnly || !isSponsor);
-  const STEPS = isSponsor ? STEPS_SPONSOR : STEPS_AUTHOR;
   const stepIdx = STEPS.indexOf(currentStep);
+
+  // Revenue share info based on launch type
+  const revenueInfo = isSponsor
+    ? "Sponsor 0.50% · Author 0.25% · Platform 0.25%"
+    : "Author 0.75% · Platform 0.25%";
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
       <div className="max-w-xl mx-auto px-4 py-10">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link
-            href="/"
-            className="p-2 rounded-full hover:bg-neutral-800 transition-colors text-neutral-400"
-          >
+          <Link href="/" className="p-2 rounded-full hover:bg-neutral-800 transition-colors text-neutral-400">
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
             <h1 className="text-2xl font-bold">
-              {isSponsor ? "Sponsor & tokenize" : "Tokenize story"}
+              {isSponsor ? "Sponsor & tokenize" : "Tokenize on Bags"}
             </h1>
-            <p className="text-sm text-neutral-500 truncate max-w-xs">
-              {story.title}
-            </p>
-            {isSponsor && (
-              <p className="text-xs text-emerald-400 mt-0.5">
-                You earn 50% of trading volume forever
-              </p>
-            )}
+            <p className="text-sm text-neutral-500 truncate max-w-xs">{story.title}</p>
+            <p className="text-xs text-amber-400 mt-0.5">{revenueInfo} of trading volume</p>
           </div>
         </div>
 
@@ -321,11 +275,7 @@ export default function TokenizePage({
             <div
               key={s}
               className={`h-1 flex-1 rounded-full transition-colors ${
-                i < stepIdx
-                  ? "bg-amber-500"
-                  : i === stepIdx
-                  ? "bg-amber-500/50"
-                  : "bg-neutral-800"
+                i < stepIdx ? "bg-amber-500" : i === stepIdx ? "bg-amber-500/50" : "bg-neutral-800"
               }`}
             />
           ))}
@@ -344,62 +294,42 @@ export default function TokenizePage({
               <div
                 key={s.id}
                 className={`p-4 rounded-2xl border transition-colors ${
-                  isCurrent
-                    ? "border-amber-500 bg-amber-500/5"
-                    : isPast
-                    ? "border-neutral-700 bg-neutral-900/50"
-                    : isError
-                    ? "border-red-800 bg-red-900/10"
+                  isCurrent ? "border-amber-500 bg-amber-500/5"
+                    : isPast ? "border-neutral-700 bg-neutral-900/50"
+                    : isError ? "border-red-800 bg-red-900/10"
                     : "border-neutral-800 bg-neutral-900/30"
                 }`}
               >
-                {/* Row */}
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div
-                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                        isPast
-                          ? "bg-amber-500 text-black"
-                          : isError
-                          ? "bg-red-600 text-white"
-                          : isCurrent
-                          ? "bg-amber-500/20 text-amber-400 border border-amber-500"
-                          : "bg-neutral-800 text-neutral-600"
-                      }`}
-                    >
+                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
+                      isPast ? "bg-amber-500 text-black"
+                        : isError ? "bg-red-600 text-white"
+                        : isCurrent ? "bg-amber-500/20 text-amber-400 border border-amber-500"
+                        : "bg-neutral-800 text-neutral-600"
+                    }`}>
                       {isPast ? "✓" : isError ? "!" : i + 1}
                     </div>
                     <div>
-                      <p
-                        className={`text-sm font-medium ${
-                          isCurrent
-                            ? "text-white"
-                            : isPast
-                            ? "text-neutral-400"
-                            : "text-neutral-600"
-                        }`}
-                      >
+                      <p className={`text-sm font-medium ${
+                        isCurrent ? "text-white" : isPast ? "text-neutral-400" : "text-neutral-600"
+                      }`}>
                         {s.label}
                       </p>
                       {state.detail && (
-                        <p
-                          className={`text-xs mt-0.5 font-mono truncate max-w-xs ${
-                            isError ? "text-red-400" : "text-neutral-500"
-                          }`}
-                        >
+                        <p className={`text-xs mt-0.5 font-mono truncate max-w-xs ${
+                          isError ? "text-red-400" : "text-neutral-500"
+                        }`}>
                           {state.detail}
                         </p>
                       )}
                     </div>
                   </div>
-                  {isLoading && (
-                    <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />
-                  )}
+                  {isLoading && <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />}
                 </div>
 
-                {/* ── Step-specific actions ─────────────────────────────── */}
+                {/* ── Step actions ───────────────────────────────────────── */}
 
-                {/* Wallet */}
                 {isCurrent && s.id === "wallet" && (
                   <button
                     onClick={handleConnectWallet}
@@ -409,10 +339,8 @@ export default function TokenizePage({
                   </button>
                 )}
 
-                {/* Details */}
                 {isCurrent && s.id === "details" && (
                   <form onSubmit={handleDetailsSubmit} className="mt-4 flex flex-col gap-4">
-                    {/* Ticker */}
                     <div>
                       <label className="block text-xs font-medium text-neutral-400 mb-1">
                         Token ticker (3–10 chars)
@@ -421,12 +349,7 @@ export default function TokenizePage({
                         type="text"
                         value={ticker}
                         onChange={(e) =>
-                          setTicker(
-                            e.target.value
-                              .toUpperCase()
-                              .replace(/[^A-Z0-9]/g, "")
-                              .slice(0, 10)
-                          )
+                          setTicker(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))
                         }
                         placeholder="STORY"
                         minLength={3}
@@ -435,22 +358,14 @@ export default function TokenizePage({
                         className="w-full px-3 py-2.5 rounded-xl bg-neutral-900 border border-neutral-700 text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500 font-mono uppercase transition-colors"
                       />
                     </div>
-
-                    {/* Cover image (optional) */}
                     <div>
                       <label className="block text-xs font-medium text-neutral-400 mb-1">
                         Cover image{" "}
-                        <span className="text-neutral-600 font-normal">(optional, shown on Bags)</span>
+                        <span className="text-neutral-600 font-normal">(optional)</span>
                       </label>
                       <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-dashed border-neutral-700 hover:border-neutral-500 transition-colors">
                         {coverPreview ? (
-                          <Image
-                            src={coverPreview}
-                            alt="Cover"
-                            width={48}
-                            height={48}
-                            className="w-12 h-12 rounded-lg object-cover"
-                          />
+                          <Image src={coverPreview} alt="Cover" width={48} height={48} className="w-12 h-12 rounded-lg object-cover" />
                         ) : (
                           <div className="w-12 h-12 rounded-lg bg-neutral-800 flex items-center justify-center">
                             <ImageIcon className="w-5 h-5 text-neutral-600" />
@@ -459,56 +374,21 @@ export default function TokenizePage({
                         <span className="text-sm text-neutral-500">
                           {coverImage ? coverImage.name : "Upload JPG or PNG"}
                         </span>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/webp"
-                          onChange={handleCoverChange}
-                          className="hidden"
-                        />
+                        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleCoverChange} className="hidden" />
                       </label>
                     </div>
-
                     <button
                       type="submit"
                       className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold text-sm transition-colors"
                     >
-                      Continue
+                      Upload to Arweave &amp; launch
                     </button>
                   </form>
                 )}
 
-                {/* Pay */}
-                {isCurrent && s.id === "pay" && (
-                  <div className="mt-4">
-                    <p className="text-xs text-neutral-400 mb-3">
-                      Transfer $1 worth of $ECHOES tokens to the platform
-                      wallet to list your story. This unlocks tokenization.
-                    </p>
-                    <div className="flex justify-between text-sm mb-2">
-                      <span className="text-neutral-400">Listing fee</span>
-                      <span className="font-mono text-white">$1 in ECHOES</span>
-                    </div>
-                    <div className="flex justify-between text-sm mb-4">
-                      <span className="text-neutral-400">Revenue share (you)</span>
-                      <span className="font-mono text-amber-400">75 %</span>
-                    </div>
-                    <button
-                      onClick={handlePayFee}
-                      className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold text-sm transition-colors"
-                    >
-                      Pay with Phantom
-                    </button>
-                  </div>
-                )}
-
-                {/* Upload / Launch: auto-triggered, no button shown */}
                 {isError && (s.id === "upload" || s.id === "launch") && (
                   <button
-                    onClick={
-                      s.id === "upload"
-                        ? () => handleArweaveUpload()
-                        : () => handleBagsLaunch(arweaveUrl)
-                    }
+                    onClick={s.id === "upload" ? () => handleArweaveUpload() : () => handleBagsLaunch(arweaveUrl)}
                     className="mt-4 w-full py-2 bg-red-800 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-colors"
                   >
                     Retry
@@ -523,38 +403,26 @@ export default function TokenizePage({
         {currentStep === "done" && (
           <div className="mt-6 p-6 rounded-2xl bg-amber-500/10 border border-amber-500 text-center">
             <CheckCircle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-            <h2 className="text-lg font-bold mb-1">Your story is live! 🎉</h2>
-            <p className="text-sm text-neutral-400 mb-5">
-              Preserved forever on Arweave. Trading on Bags App now.{" "}
-              {isSponsor
-                ? "You earn 50% of all trading volume as the sponsor."
-                : "You earn 75% of all trading volume."}
+            <h2 className="text-lg font-bold mb-1">Token is live! 🎉</h2>
+            <p className="text-sm text-neutral-400 mb-2">
+              Stored forever on Arweave. Trading on Bags App.
             </p>
+            <p className="text-xs text-amber-400 mb-5">{revenueInfo} of all trading volume</p>
             <div className="flex flex-col gap-2">
               {arweaveUrl && (
-                <a
-                  href={arweaveUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm transition-colors"
-                >
+                <a href={arweaveUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm transition-colors">
                   <ExternalLink className="w-4 h-4" /> View on Arweave
                 </a>
               )}
               {bagsUrl && (
-                <a
-                  href={bagsUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-sm font-semibold transition-colors"
-                >
+                <a href={bagsUrl} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-sm font-semibold transition-colors">
                   <ExternalLink className="w-4 h-4" /> Trade on Bags App
                 </a>
               )}
               {tokenMint && (
-                <p className="text-xs text-neutral-600 font-mono mt-1">
-                  Mint: {tokenMint}
-                </p>
+                <p className="text-xs text-neutral-600 font-mono mt-1">Mint: {tokenMint}</p>
               )}
             </div>
           </div>

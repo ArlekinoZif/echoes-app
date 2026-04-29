@@ -80,8 +80,8 @@ export default function RecordPage() {
     if (gate === "evaluate") {
       router.push("/evaluate");
     } else {
-      // tokenize page handles $ECHOES listing fee + Arweave + Bags launch
-      router.push(`/tokenize/${story.id}`);
+      // listing page handles the $1 ECHOES payment → story goes live
+      router.push(`/list/${story.id}`);
     }
   };
 
@@ -219,11 +219,10 @@ export default function RecordPage() {
                     <DollarSign className="w-5 h-5 text-amber-400" />
                   </div>
                   <div>
-                    <p className="font-semibold">Pay to list &amp; tokenize</p>
+                    <p className="font-semibold">Pay $1 to list</p>
                     <p className="text-sm text-neutral-400 mt-1">
-                      $1 in $ECHOES tokens — your story is listed immediately,
-                      uploaded to Arweave forever, and launched on Bags App.
-                      You earn 75% of all trading volume.
+                      $1 in $ECHOES tokens — your story is listed immediately
+                      and enters the weekly vote pool.
                     </p>
                   </div>
                 </div>
@@ -262,7 +261,7 @@ export default function RecordPage() {
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" /> Uploading…
                 </span>
-              ) : gate === "pay" ? "Proceed to payment" : "Start evaluating"}
+              ) : gate === "pay" ? "Pay $1 in $ECHOES to list" : "Start evaluating"}
             </button>
           </div>
         )}
