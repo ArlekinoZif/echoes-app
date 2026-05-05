@@ -3,6 +3,7 @@ import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import NavBar from "@/components/NavBar";
 import Onboarding from "@/components/Onboarding";
+import AuthGate from "@/components/AuthGate";
 import Providers from "@/providers/PrivyProvider";
 
 const spaceGrotesk = Space_Grotesk({
@@ -26,9 +27,11 @@ export default function RootLayout({
     <html lang="en" className={`h-full antialiased ${spaceGrotesk.variable}`}>
       <body className="min-h-full flex flex-col pb-24" style={{ background: "var(--bg)" }}>
         <Providers>
-          {children}
-          <NavBar />
-          <Onboarding />
+          <AuthGate>
+            {children}
+            <NavBar />
+            <Onboarding />
+          </AuthGate>
         </Providers>
       </body>
     </html>
