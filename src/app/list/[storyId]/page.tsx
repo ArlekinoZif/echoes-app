@@ -8,7 +8,7 @@ import { Story } from "@/lib/types";
 import { useWallet } from "@/hooks/useWallet";
 import { payListingFee } from "@/lib/echoes-payment";
 import {
-  ArrowLeft, Wallet, DollarSign, CheckCircle, Loader2, ExternalLink,
+  ArrowLeft, Wallet, DollarSign, CheckCircle, Loader2, ExternalLink, Copy,
 } from "lucide-react";
 
 const RPC_URL =
@@ -31,6 +31,8 @@ export default function ListPage({
   const [txSig, setTxSig] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showTopUp, setShowTopUp] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     fetchStory(storyId).then((s) => {
@@ -63,6 +65,7 @@ export default function ListPage({
     setError("");
     try {
       const sig = await payListingFee(address, RPC_URL, signTransaction);
+      setShowTopUp(false);
       setTxSig(sig);
 
       const updated: Story = {
@@ -75,10 +78,26 @@ export default function ListPage({
       setStory(updated);
       setStep("done");
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Payment failed");
+      const msg = e instanceof Error ? e.message : "Payment failed";
+      setError(msg);
+      if (
+        msg.toLowerCase().includes("insufficient") ||
+        msg.toLowerCase().includes("balance") ||
+        msg.toLowerCase().includes("funds") ||
+        msg.toLowerCase().includes("0x1")
+      ) {
+        setShowTopUp(true);
+      }
     } finally {
       setLoading(false);
     }
+  }
+
+  async function handleCopyAddress() {
+    if (!address) return;
+    await navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
   }
 
   if (!story) return null;
@@ -194,6 +213,52 @@ export default function ListPage({
               >
                 {error}
               </p>
+            )}
+
+            {showTopUp && address && (
+              <div
+                className="flex flex-col gap-3 p-4 rounded-2xl"
+                style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.3)" }}
+              >
+                <p className="text-sm font-semibold" style={{ color: "var(--text-1)" }}>
+                  Top up your wallet with $ECHOES
+                </p>
+                <p className="text-xs" style={{ color: "var(--text-2)" }}>
+                  You need at least $1 worth of $ECHOES tokens. Send them to your wallet address below.
+                </p>
+
+                {/* Wallet address row */}
+                <div
+                  className="flex items-center gap-2 p-3 rounded-xl"
+                  style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.07)" }}
+                >
+                  <span className="flex-1 font-mono text-xs truncate" style={{ color: "var(--text-2)" }}>
+                    {address}
+                  </span>
+                  <button
+                    onClick={handleCopyAddress}
+                    className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-colors"
+                    style={
+                      copied
+                        ? { background: "rgba(245,158,11,0.15)", color: "var(--amber)" }
+                        : { background: "rgba(0,0,0,0.05)", color: "var(--text-2)" }
+                    }
+                  >
+                    <Copy className="w-3 h-3" />
+                    {copied ? "Copied!" : "Copy"}
+                  </button>
+                </div>
+
+                <a
+                  href="https://bags.fm/?ref=echoesfans"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80"
+                  style={{ background: "var(--amber)", color: "#000" }}
+                >
+                  <ExternalLink className="w-3 h-3" /> Get $ECHOES on Bags App
+                </a>
+              </div>
             )}
 
             <button

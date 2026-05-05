@@ -28,8 +28,8 @@ export default function RootLayout({
         <Providers>
           {children}
           <NavBar />
+          <Onboarding />
         </Providers>
-        <Onboarding />
       </body>
     </html>
   );

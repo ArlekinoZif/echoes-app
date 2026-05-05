@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { Mic, Library, Zap } from "lucide-react";
+import { useWallet } from "@/hooks/useWallet";
 
 const SLIDES = [
   {
@@ -25,6 +26,7 @@ const SLIDES = [
 ];
 
 export default function Onboarding() {
+  const { authenticated, connect } = useWallet();
   const [visible, setVisible] = useState(false);
   const [slide, setSlide] = useState(0);
   const [exiting, setExiting] = useState(false);
@@ -42,11 +44,14 @@ export default function Onboarding() {
     }, 300);
   }
 
-  function next() {
+  async function next() {
     if (slide < SLIDES.length - 1) {
       setSlide((s) => s + 1);
     } else {
       dismiss();
+      if (!authenticated) {
+        try { await connect(); } catch { /* user closed modal */ }
+      }
     }
   }
 
