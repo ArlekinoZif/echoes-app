@@ -21,8 +21,8 @@ export default function NavBar() {
 
   return (
     <nav
-      className="fixed bottom-0 inset-x-0 z-50 safe-bottom"
-      style={{ background: "transparent" }}
+      className="safe-bottom"
+      style={{ position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 50, background: "transparent" }}
     >
       {/* pill container */}
       <div className="max-w-xs mx-auto mb-5 px-2">
