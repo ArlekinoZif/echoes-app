@@ -19,19 +19,19 @@ Every story is an audio recording. Every recording can become a token. Every tok
 
 # Flow:
 
-1. Record
+1. Record:
 A person records up to 5 minutes of audio inside the app.
 
-2. List
+2. List:
 The story is published on Echoes (stored temporarily on Cloudflare).
 
-3. Tokenize
+3. Tokenize:
 The story gets a unique token launched on Bags and stored permanently on Arweave. This can be done by the author, or by any listener.
 
-4. Trade
+4. Trade:
 Anyone can buy and sell the story token on Bags.
 
-5. Earn
+5. Earn:
 The author receives up to 0.75% of all trading volume, forever.
 
 # Test it
