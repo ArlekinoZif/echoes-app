@@ -2,16 +2,16 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { getStories } from "@/lib/store";
+import { fetchMyStories } from "@/lib/db";
 import { Story } from "@/lib/types";
-import { connectWallet, getConnectedWallet } from "@/lib/wallet";
+import { useWallet } from "@/hooks/useWallet";
 import {
   ArrowLeft, Wallet, Coins, TrendingUp, CheckCircle,
   Clock, ExternalLink, Loader2, RefreshCw, BarChart3,
 } from "lucide-react";
 
 interface DashboardData {
-  wallet: string;
+  address: string;
   solBalance: number;
   skrBalance: number;
   stakedSkrBalance: number;
@@ -52,7 +52,7 @@ function shortSig(sig: string): string {
 }
 
 export default function DashboardPage() {
-  const [wallet, setWallet] = useState<string | null>(null);
+  const { address, connect } = useWallet();
   const [data, setData] = useState<DashboardData | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(false);
@@ -63,9 +63,13 @@ export default function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/dashboard?wallet=${addr}`);
+      const [res, mine] = await Promise.all([
+        fetch(`/api/dashboard?address=${addr}`),
+        fetchMyStories(addr),
+      ]);
       if (!res.ok) throw new Error((await res.json()).error);
       setData(await res.json());
+      setStories(mine);
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Failed to load");
     } finally {
@@ -75,25 +79,21 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    setStories(getStories());
-    const addr = getConnectedWallet();
-    if (addr) { setWallet(addr); fetchData(addr); }
-  }, [fetchData]);
+    if (address) fetchData(address);
+  }, [address, fetchData]);
 
   const handleConnect = async () => {
     try {
-      const addr = await connectWallet();
-      setWallet(addr);
-      fetchData(addr);
+      await connect();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Connection failed");
     }
   };
 
   const handleRefresh = () => {
-    if (!wallet) return;
+    if (!address) return;
     setRefreshing(true);
-    fetchData(wallet);
+    fetchData(address);
   };
 
   const tokenizedStories = stories.filter((s) => s.status === "tokenized");
@@ -111,14 +111,14 @@ export default function DashboardPage() {
             </Link>
             <div>
               <h1 className="text-2xl font-bold">Dashboard</h1>
-              {wallet && (
+              {address && (
                 <p className="text-xs text-neutral-500 font-mono">
-                  {wallet.slice(0, 6)}…{wallet.slice(-6)}
+                  {address.slice(0, 6)}…{address.slice(-6)}
                 </p>
               )}
             </div>
           </div>
-          {wallet && (
+          {address && (
             <button
               onClick={handleRefresh}
               disabled={refreshing}
@@ -129,21 +129,21 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Connect wallet prompt */}
-        {!wallet && (
+        {/* Connect address prompt */}
+        {!address && (
           <div className="text-center py-16 flex flex-col items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center">
               <Wallet className="w-7 h-7 text-neutral-600" />
             </div>
             <div>
-              <p className="font-semibold">Connect your wallet</p>
+              <p className="font-semibold">Connect your address</p>
               <p className="text-sm text-neutral-500 mt-1">See your earnings, tokens, and story performance.</p>
             </div>
             <button
               onClick={handleConnect}
               className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold transition-colors"
             >
-              Connect Phantom
+              Connect wallet
             </button>
           </div>
         )}
@@ -190,7 +190,7 @@ export default function DashboardPage() {
               <StatCard
                 label="SKR balance"
                 value={`${data.skrBalance.toLocaleString()} SKR`}
-                sub="wallet (unstaked)"
+                sub="address (unstaked)"
                 icon={<Coins className="w-4 h-4 text-amber-400" />}
               />
               <StatCard
@@ -249,7 +249,7 @@ export default function DashboardPage() {
                       {story.status === "tokenized" && (
                         <div className="mt-3 pt-3 border-t border-neutral-800 flex items-center justify-between">
                           <div className="text-xs text-neutral-500">
-                            Author share: <span className="text-amber-400 font-semibold">80% of volume</span>
+                            Author share: <span className="text-amber-400 font-semibold">0.75% of trading fees</span>
                           </div>
                           <a
                             href={`https://bags.fm/token/${story.id}?ref=sirhitalk`}

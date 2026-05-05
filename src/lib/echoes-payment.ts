@@ -22,7 +22,6 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
-import { getPhantom } from "./wallet";
 
 const ECHOES_MINT = new PublicKey(
   process.env.NEXT_PUBLIC_ECHOES_TOKEN_MINT ??
@@ -55,10 +54,9 @@ async function getEchoesPriceUsd(): Promise<number> {
  */
 export async function payListingFee(
   senderWallet: string,
-  rpcUrl: string
+  rpcUrl: string,
+  signTransaction: (tx: Transaction) => Promise<Transaction>
 ): Promise<string> {
-  const phantom = getPhantom();
-  if (!phantom) throw new Error("Phantom not connected");
 
   // 1. Get price → compute raw token amount
   const priceUsd = await getEchoesPriceUsd();
@@ -113,8 +111,8 @@ export async function payListingFee(
     lastValidBlockHeight,
   }).add(...instructions);
 
-  // 6. Sign + send via Phantom
-  const signed = await phantom.signTransaction(tx);
+  // 6. Sign + send
+  const signed = await signTransaction(tx);
   const sig = await connection.sendRawTransaction(signed.serialize());
   await connection.confirmTransaction(
     { signature: sig, blockhash, lastValidBlockHeight },

@@ -93,38 +93,43 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
 
   return (
-    <div className="flex flex-col items-center gap-6 p-8 rounded-2xl bg-neutral-900 border border-neutral-800">
+    <div
+      className="flex flex-col items-center gap-6 p-8 rounded-2xl"
+      style={{ background: "rgba(255,255,255,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}
+    >
       {/* Waveform / status visual */}
       <div className="flex items-center gap-1 h-12">
         {state === "recording" ? (
           Array.from({ length: 20 }).map((_, i) => (
             <div
               key={i}
-              className="w-1 bg-red-500 rounded-full animate-pulse"
+              className="w-1 rounded-full animate-pulse"
               style={{
                 height: `${20 + Math.random() * 28}px`,
+                background: "linear-gradient(180deg, #ff6b9d, #c77dff)",
                 animationDelay: `${i * 50}ms`,
               }}
             />
           ))
         ) : state === "recorded" ? (
-          <div className="w-48 h-2 bg-neutral-700 rounded-full overflow-hidden">
+          <div
+            className="w-48 h-2 rounded-full overflow-hidden"
+            style={{ background: "rgba(0,0,0,0.08)" }}
+          >
             <div
-              className="h-full bg-amber-500 transition-all"
-              style={{ width: `${playProgress}%` }}
+              className="h-full transition-all"
+              style={{ width: `${playProgress}%`, background: "var(--amber)" }}
             />
           </div>
         ) : (
-          <Mic className="w-10 h-10 text-neutral-600" />
+          <Mic className="w-10 h-10" style={{ color: "var(--text-3)" }} />
         )}
       </div>
 
       {/* Timer */}
       <span
-        className={clsx(
-          "text-3xl font-mono font-bold",
-          state === "recording" ? "text-red-400" : "text-neutral-400"
-        )}
+        className={clsx("text-3xl font-mono font-bold")}
+        style={{ color: state === "recording" ? "#ff6b9d" : "var(--text-2)" }}
       >
         {fmt(duration)}
       </span>
@@ -134,7 +139,8 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
         {state === "idle" && (
           <button
             onClick={startRecording}
-            className="flex items-center gap-2 px-6 py-3 bg-red-600 hover:bg-red-500 text-white rounded-full font-semibold transition-colors"
+            className="flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-colors"
+            style={{ background: "linear-gradient(135deg, #ff6b9d, #c77dff)", color: "#fff" }}
           >
             <Mic className="w-4 h-4" />
             Start Recording
@@ -144,9 +150,10 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
         {state === "recording" && (
           <button
             onClick={stopRecording}
-            className="flex items-center gap-2 px-6 py-3 bg-neutral-700 hover:bg-neutral-600 text-white rounded-full font-semibold transition-colors"
+            className="flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-colors"
+            style={{ background: "rgba(0,0,0,0.08)", color: "var(--text-1)", border: "1px solid rgba(0,0,0,0.1)" }}
           >
-            <Square className="w-4 h-4 fill-white" />
+            <Square className="w-4 h-4" style={{ fill: "var(--text-1)" }} />
             Stop
           </button>
         )}
@@ -155,14 +162,16 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
           <>
             <button
               onClick={discard}
-              className="p-3 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 transition-colors"
+              className="p-3 rounded-full transition-colors"
+              style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-3)" }}
               title="Discard"
             >
               <Trash2 className="w-5 h-5" />
             </button>
             <button
               onClick={togglePlay}
-              className="p-3 rounded-full bg-neutral-800 hover:bg-neutral-700 text-white transition-colors"
+              className="p-3 rounded-full transition-colors"
+              style={{ background: "rgba(0,0,0,0.08)", color: "var(--text-1)" }}
             >
               {isPlaying ? (
                 <Pause className="w-5 h-5" />
@@ -172,7 +181,8 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
             </button>
             <button
               onClick={confirm}
-              className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-full font-semibold transition-colors"
+              className="px-6 py-3 rounded-full font-semibold transition-colors"
+              style={{ background: "var(--amber)", color: "#000" }}
             >
               Use this recording
             </button>
@@ -181,7 +191,7 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
       </div>
 
       {state === "idle" && (
-        <p className="text-xs text-neutral-600 text-center">
+        <p className="text-xs text-center" style={{ color: "var(--text-3)" }}>
           Your microphone will be used to record your story.
         </p>
       )}

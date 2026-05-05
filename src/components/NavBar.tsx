@@ -7,41 +7,85 @@ import { BookOpen, Mic, User } from "lucide-react";
 const NAV = [
   { href: "/", icon: BookOpen, label: "Library" },
   { href: "/record", icon: Mic, label: "Record" },
-  { href: "/zone", icon: User, label: "Zone" },
+  { href: "/zone", icon: User, label: "Patio" },
 ] as const;
 
-/** Hide the nav bar on deep flow pages */
 const HIDDEN_ON = ["/record", "/evaluate/", "/tokenize/", "/list/", "/vote"];
 
 export default function NavBar() {
   const pathname = usePathname();
 
-  // Hide on record page and any detail subpage
   if (HIDDEN_ON.some((p) => pathname === p || pathname.startsWith(p))) {
     return null;
   }
 
   return (
-    <nav className="fixed bottom-0 inset-x-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 safe-bottom">
-      <div className="max-w-xl mx-auto flex">
-        {NAV.map(({ href, icon: Icon, label }) => {
-          const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-colors ${
-                active ? "text-amber-400" : "text-neutral-600 hover:text-neutral-400"
-              }`}
-            >
-              <Icon className={`w-5 h-5 ${label === "Record" ? "w-6 h-6" : ""}`} />
-              <span className="text-[10px] font-medium">{label}</span>
-              {active && (
-                <span className="absolute bottom-0 w-8 h-0.5 bg-amber-500 rounded-full" />
-              )}
-            </Link>
-          );
-        })}
+    <nav
+      className="fixed bottom-0 inset-x-0 z-50 safe-bottom"
+      style={{ background: "transparent" }}
+    >
+      {/* pill container */}
+      <div className="max-w-xs mx-auto mb-5 px-2">
+        <div
+          className="flex items-center rounded-2xl overflow-hidden"
+          style={{
+            background: "rgba(255,255,255,0.72)",
+            backdropFilter: "blur(20px)",
+            WebkitBackdropFilter: "blur(20px)",
+            border: "1px solid rgba(255,255,255,0.9)",
+            boxShadow: "0 4px 24px rgba(0,0,0,0.08), 0 1px 0 rgba(255,255,255,0.8) inset",
+          }}
+        >
+          {NAV.map(({ href, icon: Icon, label }) => {
+            const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
+            const isRecord = label === "Record";
+
+            return (
+              <Link
+                key={href}
+                href={href}
+                className="flex-1 flex flex-col items-center justify-center gap-1 py-3 transition-all relative"
+              >
+                {isRecord ? (
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center transition-transform active:scale-90"
+                    style={{
+                      background: "linear-gradient(135deg, #a8edea, #fed6e3, #c3b1e1)",
+                    }}
+                  >
+                    <Icon className="w-4 h-4 text-black" strokeWidth={2.5} />
+                  </div>
+                ) : (
+                  <Icon
+                    className="w-5 h-5 transition-colors"
+                    style={{ color: active ? "#111111" : "rgba(0,0,0,0.28)" }}
+                    strokeWidth={active ? 2 : 1.5}
+                  />
+                )}
+                <span
+                  className="text-[9px] font-semibold uppercase tracking-widest transition-colors"
+                  style={{
+                    color: active && !isRecord
+                      ? "rgba(0,0,0,0.6)"
+                      : isRecord
+                      ? "rgba(0,0,0,0.35)"
+                      : "rgba(0,0,0,0.25)",
+                  }}
+                >
+                  {label}
+                </span>
+                {active && !isRecord && (
+                  <span
+                    className="absolute bottom-0 left-1/2 -translate-x-1/2 w-4 h-px"
+                    style={{
+                      background: "linear-gradient(90deg, transparent, rgba(168,237,234,0.8), transparent)",
+                    }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

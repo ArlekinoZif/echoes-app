@@ -29,10 +29,12 @@ export function getStory(id: string): Story | undefined {
   return getStories().find((s) => s.id === id);
 }
 
-/** Stories waiting to be evaluated (pending_eval gate). */
-export function getStoriesForEvaluation(excludeId?: string): Story[] {
+/** Stories waiting to be evaluated. Excludes the current user's own stories. */
+export function getStoriesForEvaluation(excludeWallet?: string | null): Story[] {
   return getStories().filter(
-    (s) => s.status === "pending_eval" && s.id !== excludeId
+    (s) =>
+      s.status === "pending_eval" &&
+      (!excludeWallet || !s.authorWallet || s.authorWallet !== excludeWallet)
   );
 }
 

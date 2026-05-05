@@ -1,34 +1,18 @@
 "use client";
 
-import { use, useEffect, useState, useRef, useCallback } from "react";
+import { use, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
-import { getStory, saveStory } from "@/lib/store";
+import { fetchStory, upsertStory } from "@/lib/db";
 import { Story } from "@/lib/types";
-import { connectWallet, getConnectedWallet, signAndSendAllBase64Txs } from "@/lib/wallet";
-import { uploadToArweave } from "@/lib/arweave";
+import { useWallet } from "@/hooks/useWallet";
 import {
-  ArrowLeft, Wallet, Upload, Zap, CheckCircle, ExternalLink,
+  ArrowLeft, Wallet, Zap, CheckCircle, ExternalLink,
   Loader2, ImageIcon,
 } from "lucide-react";
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
-
-/**
- * Tokenize page — Arweave upload + Bags App token launch.
- *
- * This is a SEPARATE action from listing. The story must already be listed
- * (status === "listed" or "pending_eval") before tokenizing. The listing fee
- * ($1 ECHOES) is handled on the /list/[storyId] page.
- *
- * Launch types:
- *   author  → author earns 0.75% of trading volume (75% of the 1% Bags fee)
- *   sponsor → sponsor earns 0.50%, author 0.25%, platform 0.25%
- */
-
-type Step = "wallet" | "details" | "upload" | "launch" | "done";
+type Step = "wallet" | "details" | "launch" | "done";
 type StepStatus = "idle" | "loading" | "done" | "error";
 
 interface StepState {
@@ -39,7 +23,6 @@ interface StepState {
 const STEP_META: { id: Step; label: string; icon: React.ReactNode }[] = [
   { id: "wallet", label: "Connect wallet", icon: <Wallet className="w-4 h-4" /> },
   { id: "details", label: "Token details", icon: <ImageIcon className="w-4 h-4" /> },
-  { id: "upload", label: "Upload to Arweave", icon: <Upload className="w-4 h-4" /> },
   { id: "launch", label: "Launch on Bags App", icon: <Zap className="w-4 h-4" /> },
   { id: "done", label: "Done!", icon: <CheckCircle className="w-4 h-4" /> },
 ];
@@ -54,15 +37,6 @@ function toMsg(e: unknown) {
   return e instanceof Error ? e.message : String(e);
 }
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (ev) => resolve(ev.target?.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 export default function TokenizePage({
   params,
 }: {
@@ -71,58 +45,46 @@ export default function TokenizePage({
   const { storyId } = use(params);
   const router = useRouter();
 
-  // Sponsor mode: ?sponsor=1 in the URL
   const [isSponsor, setIsSponsor] = useState(false);
   useEffect(() => {
     const p = new URLSearchParams(window.location.search);
     setIsSponsor(p.get("sponsor") === "1");
   }, []);
 
+  const { authenticated, address, connect, signAndSendAllBase64Txs } = useWallet();
+
   const [story, setStory] = useState<Story | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>("wallet");
   const [stepStates, setStepStates] = useState<Record<Step, StepState>>(initStates());
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
 
-  // Details form
   const [ticker, setTicker] = useState("");
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState("");
 
-  // Results
-  const [arweaveUrl, setArweaveUrl] = useState("");
   const [tokenMint, setTokenMint] = useState("");
   const [bagsUrl, setBagsUrl] = useState("");
 
-  const audioBlobRef = useRef<Blob | null>(null);
-
-  const setStep = useCallback((step: Step, state: StepState) =>
-    setStepStates((prev) => ({ ...prev, [step]: state })), []);
+  const setStep = useCallback(
+    (step: Step, state: StepState) =>
+      setStepStates((prev) => ({ ...prev, [step]: state })),
+    []
+  );
 
   useEffect(() => {
-    const s = getStory(storyId);
-    if (!s) { router.push("/"); return; }
-    setStory(s);
-
-    fetch(s.audioBlobUrl)
-      .then((r) => r.blob())
-      .then((b) => { audioBlobRef.current = b; })
-      .catch(console.warn);
-
-    const addr = getConnectedWallet();
-    if (addr) {
-      setWalletAddress(addr);
-      setStep("wallet", { status: "done", detail: addr.slice(0, 6) + "…" + addr.slice(-4) });
-      setCurrentStep("details");
-    }
-  }, [storyId, router, setStep]);
-
-  // ── Handlers ──────────────────────────────────────────────────────────────
+    fetchStory(storyId).then((s) => {
+      if (!s) { router.push("/"); return; }
+      setStory(s);
+      if (authenticated && address) {
+        setStep("wallet", { status: "done", detail: address.slice(0, 6) + "…" + address.slice(-4) });
+        setCurrentStep("details");
+      }
+    });
+  }, [storyId, router, setStep, authenticated, address]);
 
   async function handleConnectWallet() {
     setStep("wallet", { status: "loading" });
     try {
-      const addr = await connectWallet();
-      setWalletAddress(addr);
+      const addr = await connect();
       setStep("wallet", { status: "done", detail: addr.slice(0, 6) + "…" + addr.slice(-4) });
       setCurrentStep("details");
     } catch (e: unknown) {
@@ -143,37 +105,26 @@ export default function TokenizePage({
     e.preventDefault();
     if (!ticker.trim()) return;
     setStep("details", { status: "done", detail: ticker.toUpperCase() });
-    setCurrentStep("upload");
-    handleArweaveUpload();
+    setCurrentStep("launch");
+    handleBagsLaunch();
   }
 
-  async function handleArweaveUpload() {
-    if (!story || !audioBlobRef.current) return;
-    setStep("upload", { status: "loading" });
-    try {
-      const result = await uploadToArweave(audioBlobRef.current, {
-        title: story.title,
-        description: story.description,
-        category: story.category,
-      });
-      setArweaveUrl(result.url);
-      setStep("upload", { status: "done", detail: result.id.slice(0, 10) + "…" });
-      setCurrentStep("launch");
-      await handleBagsLaunch(result.url);
-    } catch (e: unknown) {
-      setStep("upload", { status: "error", detail: toMsg(e) });
-    }
-  }
-
-  async function handleBagsLaunch(arweaveAudioUrl: string) {
-    if (!story || !walletAddress) return;
+  async function handleBagsLaunch() {
+    if (!story || !address) return;
     setStep("launch", { status: "loading" });
     try {
       // 1. Cover image (optional)
       let imageBase64: string | undefined;
-      if (coverImage) imageBase64 = await fileToBase64(coverImage);
+      if (coverImage) {
+        imageBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (ev) => resolve(ev.target?.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(coverImage);
+        });
+      }
 
-      // 2. Create token info (server-side)
+      // 2. Create token info
       const infoRes = await fetch("/api/bags/info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -182,60 +133,65 @@ export default function TokenizePage({
           symbol: ticker.toUpperCase(),
           description: story.description,
           imageBase64,
-          arweaveUrl: arweaveAudioUrl,
         }),
       });
       if (!infoRes.ok) throw new Error((await infoRes.json()).error ?? "Token info failed");
-      const { tokenInfoId } = await infoRes.json();
+      const { tokenMint, tokenMetadata } = await infoRes.json();
 
-      // 3. Get unsigned launch transactions (server-side)
-      const launchRes = await fetch("/api/bags/launch-txs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tokenInfoId, creatorWallet: walletAddress }),
-      });
-      if (!launchRes.ok) throw new Error((await launchRes.json()).error ?? "Launch failed");
-      const { transactions: launchTxs, mint } = await launchRes.json();
-
-      // 4. Phantom signs + sends
-      await signAndSendAllBase64Txs(launchTxs, RPC_URL);
-      const resolvedMint: string = mint || tokenInfoId;
-
-      // 5. Fee-share config (50/25/25 for sponsor, 75/25 for author)
-      const feeRes = await fetch("/api/bags/fee-share-txs", {
+      // 3. Create fee-share config (before launch)
+      const feeRes = await fetch("/api/bags/fee-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          mint: resolvedMint,
+          payer: address,
+          tokenMint,
           launchType: isSponsor ? "sponsor" : "author",
-          authorWallet: isSponsor ? (story.authorWallet ?? walletAddress) : walletAddress,
-          sponsorWallet: isSponsor ? walletAddress : undefined,
+          authorWallet: isSponsor ? (story.authorWallet ?? address) : address,
+          sponsorWallet: isSponsor ? address : undefined,
         }),
       });
-      if (!feeRes.ok) throw new Error((await feeRes.json()).error ?? "Fee-share failed");
-      const { transactions: feeTxs } = await feeRes.json();
-      if (feeTxs?.length) await signAndSendAllBase64Txs(feeTxs, RPC_URL);
+      if (!feeRes.ok) throw new Error((await feeRes.json()).error ?? "Fee config failed");
+      const { meteoraConfigKey, transactions: feeTxs } = await feeRes.json();
 
-      // 6. Persist
-      const listingUrl = `https://bags.fm/token/${resolvedMint}?ref=sirhitalk`;
+      // 4. Sign fee-share config transactions
+      if (feeTxs?.length) await signAndSendAllBase64Txs(feeTxs);
+
+      // 5. Create launch transaction
+      const launchRes = await fetch("/api/bags/launch-txs", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tokenMint,
+          tokenMetadata,
+          wallet: address,
+          configKey: meteoraConfigKey,
+        }),
+      });
+      if (!launchRes.ok) throw new Error((await launchRes.json()).error ?? "Launch failed");
+      const { transaction: launchTx } = await launchRes.json();
+
+      // 6. Sign + send launch transaction
+      await signAndSendAllBase64Txs([launchTx]);
+
+      // 7. Persist
+      const listingUrl = `https://bags.fm/token/${tokenMint}?ref=sirhitalk`;
       setBagsUrl(listingUrl);
-      setTokenMint(resolvedMint);
+      setTokenMint(tokenMint);
 
       const updated: Story = {
         ...story,
         status: "tokenized",
         ticker: ticker.toUpperCase(),
-        tokenMint: resolvedMint,
+        tokenMint,
         tokenListingUrl: listingUrl,
         launchType: isSponsor ? "sponsor" : "author",
-        authorWallet: isSponsor ? (story.authorWallet ?? walletAddress) : walletAddress,
-        sponsorWallet: isSponsor ? walletAddress : undefined,
-        arweaveCid: arweaveAudioUrl,
+        authorWallet: isSponsor ? (story.authorWallet ?? address) : address,
+        sponsorWallet: isSponsor ? address : undefined,
       };
-      saveStory(updated);
+      await upsertStory(updated);
       setStory(updated);
 
-      setStep("launch", { status: "done", detail: resolvedMint.slice(0, 8) + "…" });
+      setStep("launch", { status: "done", detail: tokenMint.slice(0, 8) + "…" });
       setCurrentStep("done");
       setStep("done", { status: "done" });
     } catch (e: unknown) {
@@ -246,26 +202,28 @@ export default function TokenizePage({
   if (!story) return null;
 
   const stepIdx = STEPS.indexOf(currentStep);
-
-  // Revenue share info based on launch type
   const revenueInfo = isSponsor
     ? "Sponsor 0.50% · Author 0.25% · Platform 0.25%"
     : "Author 0.75% · Platform 0.25%";
 
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
       <div className="max-w-xl mx-auto px-4 py-10">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
-          <Link href="/" className="p-2 rounded-full hover:bg-neutral-800 transition-colors text-neutral-400">
+          <Link
+            href="/"
+            className="p-2 rounded-full transition-colors"
+            style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.07)", color: "var(--text-2)" }}
+          >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">
+            <h1 className="text-2xl font-bold" style={{ color: "var(--text-1)" }}>
               {isSponsor ? "Sponsor & tokenize" : "Tokenize on Bags"}
             </h1>
-            <p className="text-sm text-neutral-500 truncate max-w-xs">{story.title}</p>
-            <p className="text-xs text-amber-400 mt-0.5">{revenueInfo} of trading volume</p>
+            <p className="text-sm truncate max-w-xs" style={{ color: "var(--text-3)" }}>{story.title}</p>
+            <p className="text-xs mt-0.5" style={{ color: "var(--amber)" }}>{revenueInfo} of trading fees</p>
           </div>
         </div>
 
@@ -274,9 +232,15 @@ export default function TokenizePage({
           {STEPS.slice(0, -1).map((s, i) => (
             <div
               key={s}
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                i < stepIdx ? "bg-amber-500" : i === stepIdx ? "bg-amber-500/50" : "bg-neutral-800"
-              }`}
+              className="h-1 flex-1 rounded-full transition-colors"
+              style={{
+                background:
+                  i < stepIdx
+                    ? "linear-gradient(90deg, #00c6be, #ff6b9d)"
+                    : i === stepIdx
+                    ? "rgba(245,158,11,0.4)"
+                    : "rgba(0,0,0,0.08)",
+              }}
             />
           ))}
         </div>
@@ -293,103 +257,144 @@ export default function TokenizePage({
             return (
               <div
                 key={s.id}
-                className={`p-4 rounded-2xl border transition-colors ${
-                  isCurrent ? "border-amber-500 bg-amber-500/5"
-                    : isPast ? "border-neutral-700 bg-neutral-900/50"
-                    : isError ? "border-red-800 bg-red-900/10"
-                    : "border-neutral-800 bg-neutral-900/30"
-                }`}
+                className="p-4 rounded-2xl transition-colors"
+                style={
+                  isCurrent
+                    ? { border: "1px solid rgba(245,158,11,0.4)", background: "rgba(245,158,11,0.04)" }
+                    : isPast
+                    ? { border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.4)" }
+                    : isError
+                    ? { border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.04)" }
+                    : { border: "1px solid rgba(0,0,0,0.05)", background: "rgba(255,255,255,0.25)" }
+                }
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
-                    <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${
-                      isPast ? "bg-amber-500 text-black"
-                        : isError ? "bg-red-600 text-white"
-                        : isCurrent ? "bg-amber-500/20 text-amber-400 border border-amber-500"
-                        : "bg-neutral-800 text-neutral-600"
-                    }`}>
+                    <div
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
+                      style={
+                        isPast
+                          ? { background: "var(--amber)", color: "#000" }
+                          : isError
+                          ? { background: "rgba(239,68,68,0.15)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }
+                          : isCurrent
+                          ? { background: "rgba(245,158,11,0.12)", color: "var(--amber)", border: "1px solid rgba(245,158,11,0.3)" }
+                          : { background: "rgba(0,0,0,0.05)", color: "var(--text-3)" }
+                      }
+                    >
                       {isPast ? "✓" : isError ? "!" : i + 1}
                     </div>
                     <div>
-                      <p className={`text-sm font-medium ${
-                        isCurrent ? "text-white" : isPast ? "text-neutral-400" : "text-neutral-600"
-                      }`}>
+                      <p
+                        className="text-sm font-medium"
+                        style={{
+                          color: isCurrent ? "var(--text-1)" : isPast ? "var(--text-3)" : "var(--text-3)",
+                        }}
+                      >
                         {s.label}
                       </p>
                       {state.detail && (
-                        <p className={`text-xs mt-0.5 font-mono truncate max-w-xs ${
-                          isError ? "text-red-400" : "text-neutral-500"
-                        }`}>
+                        <p
+                          className="text-xs mt-0.5 font-mono truncate max-w-xs"
+                          style={{ color: isError ? "#dc2626" : "var(--text-3)" }}
+                        >
                           {state.detail}
                         </p>
                       )}
                     </div>
                   </div>
-                  {isLoading && <Loader2 className="w-4 h-4 animate-spin text-amber-400 shrink-0" />}
+                  {isLoading && (
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" style={{ color: "var(--amber)" }} />
+                  )}
                 </div>
-
-                {/* ── Step actions ───────────────────────────────────────── */}
 
                 {isCurrent && s.id === "wallet" && (
                   <button
                     onClick={handleConnectWallet}
-                    className="mt-4 w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold text-sm transition-colors"
+                    className="mt-4 w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
+                    style={{ background: "var(--amber)", color: "#000" }}
                   >
-                    Connect Phantom
+                    Connect wallet
                   </button>
                 )}
 
                 {isCurrent && s.id === "details" && (
                   <form onSubmit={handleDetailsSubmit} className="mt-4 flex flex-col gap-4">
                     <div>
-                      <label className="block text-xs font-medium text-neutral-400 mb-1">
+                      <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-2)" }}>
                         Token ticker (3–10 chars)
                       </label>
                       <input
                         type="text"
                         value={ticker}
                         onChange={(e) =>
-                          setTicker(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10))
+                          setTicker(
+                            e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 10)
+                          )
                         }
                         placeholder="STORY"
                         minLength={3}
                         maxLength={10}
                         required
-                        className="w-full px-3 py-2.5 rounded-xl bg-neutral-900 border border-neutral-700 text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500 font-mono uppercase transition-colors"
+                        className="w-full px-3 py-2.5 rounded-xl font-mono uppercase text-sm focus:outline-none transition-colors"
+                        style={{
+                          background: "rgba(255,255,255,0.7)",
+                          border: "1px solid rgba(0,0,0,0.1)",
+                          color: "var(--text-1)",
+                        }}
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-neutral-400 mb-1">
+                      <label className="block text-xs font-medium mb-1" style={{ color: "var(--text-2)" }}>
                         Cover image{" "}
-                        <span className="text-neutral-600 font-normal">(optional)</span>
+                        <span className="font-normal" style={{ color: "var(--text-3)" }}>(optional)</span>
                       </label>
-                      <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-dashed border-neutral-700 hover:border-neutral-500 transition-colors">
+                      <label
+                        className="flex items-center gap-3 cursor-pointer p-3 rounded-xl transition-colors"
+                        style={{ border: "1px dashed rgba(0,0,0,0.15)", background: "rgba(255,255,255,0.5)" }}
+                      >
                         {coverPreview ? (
-                          <Image src={coverPreview} alt="Cover" width={48} height={48} className="w-12 h-12 rounded-lg object-cover" />
+                          <Image
+                            src={coverPreview}
+                            alt="Cover"
+                            width={48}
+                            height={48}
+                            className="w-12 h-12 rounded-lg object-cover"
+                          />
                         ) : (
-                          <div className="w-12 h-12 rounded-lg bg-neutral-800 flex items-center justify-center">
-                            <ImageIcon className="w-5 h-5 text-neutral-600" />
+                          <div
+                            className="w-12 h-12 rounded-lg flex items-center justify-center"
+                            style={{ background: "rgba(0,0,0,0.06)" }}
+                          >
+                            <ImageIcon className="w-5 h-5" style={{ color: "var(--text-3)" }} />
                           </div>
                         )}
-                        <span className="text-sm text-neutral-500">
+                        <span className="text-sm" style={{ color: "var(--text-2)" }}>
                           {coverImage ? coverImage.name : "Upload JPG or PNG"}
                         </span>
-                        <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleCoverChange} className="hidden" />
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          onChange={handleCoverChange}
+                          className="hidden"
+                        />
                       </label>
                     </div>
                     <button
                       type="submit"
-                      className="w-full py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold text-sm transition-colors"
+                      className="w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
+                      style={{ background: "var(--amber)", color: "#000" }}
                     >
-                      Upload to Arweave &amp; launch
+                      Launch on Bags →
                     </button>
                   </form>
                 )}
 
-                {isError && (s.id === "upload" || s.id === "launch") && (
+                {isError && s.id === "launch" && (
                   <button
-                    onClick={s.id === "upload" ? () => handleArweaveUpload() : () => handleBagsLaunch(arweaveUrl)}
-                    className="mt-4 w-full py-2 bg-red-800 hover:bg-red-700 text-white rounded-xl text-sm font-semibold transition-colors"
+                    onClick={() => handleBagsLaunch()}
+                    className="mt-4 w-full py-2 rounded-xl text-sm font-semibold transition-colors"
+                    style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}
                   >
                     Retry
                   </button>
@@ -401,28 +406,28 @@ export default function TokenizePage({
 
         {/* Done card */}
         {currentStep === "done" && (
-          <div className="mt-6 p-6 rounded-2xl bg-amber-500/10 border border-amber-500 text-center">
-            <CheckCircle className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-            <h2 className="text-lg font-bold mb-1">Token is live! 🎉</h2>
-            <p className="text-sm text-neutral-400 mb-2">
-              Stored forever on Arweave. Trading on Bags App.
-            </p>
-            <p className="text-xs text-amber-400 mb-5">{revenueInfo} of all trading volume</p>
+          <div
+            className="mt-6 p-6 rounded-2xl text-center"
+            style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.3)" }}
+          >
+            <CheckCircle className="w-10 h-10 mx-auto mb-3" style={{ color: "var(--amber)" }} />
+            <h2 className="text-lg font-bold mb-1" style={{ color: "var(--text-1)" }}>Token is live!</h2>
+            <p className="text-sm mb-2" style={{ color: "var(--text-2)" }}>Your story is now trading on Bags App.</p>
+            <p className="text-xs mb-5" style={{ color: "var(--amber)" }}>{revenueInfo} of all trading fees</p>
             <div className="flex flex-col gap-2">
-              {arweaveUrl && (
-                <a href={arweaveUrl} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 bg-neutral-800 hover:bg-neutral-700 rounded-xl text-sm transition-colors">
-                  <ExternalLink className="w-4 h-4" /> View on Arweave
-                </a>
-              )}
               {bagsUrl && (
-                <a href={bagsUrl} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-sm font-semibold transition-colors">
+                <a
+                  href={bagsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
+                  style={{ background: "var(--amber)", color: "#000" }}
+                >
                   <ExternalLink className="w-4 h-4" /> Trade on Bags App
                 </a>
               )}
               {tokenMint && (
-                <p className="text-xs text-neutral-600 font-mono mt-1">Mint: {tokenMint}</p>
+                <p className="text-xs font-mono mt-1" style={{ color: "var(--text-3)" }}>Mint: {tokenMint}</p>
               )}
             </div>
           </div>

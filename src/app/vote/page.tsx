@@ -5,7 +5,7 @@ import Link from "next/link";
 import {
   ArrowLeft, Trophy, Eye, EyeOff, Loader2, CheckCircle, Clock, Coins,
 } from "lucide-react";
-import { connectWallet, getConnectedWallet } from "@/lib/wallet";
+import { useWallet } from "@/hooks/useWallet";
 import { generateSalt, computeCommitment, saveSalt, getSalt } from "@/lib/commit-reveal";
 
 type Phase = "voting" | "reveal" | "finalized";
@@ -56,9 +56,9 @@ function fmt(s: number) {
 }
 
 export default function VotePage() {
+  const { address, connect } = useWallet();
   const [pool, setPool] = useState<PoolData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [wallet, setWallet] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [echoesAmount, setEchoesAmount] = useState(10);
   const [voting, setVoting] = useState(false);
@@ -84,8 +84,6 @@ export default function VotePage() {
 
   useEffect(() => {
     loadPool();
-    const addr = getConnectedWallet();
-    if (addr) setWallet(addr);
   }, [loadPool]);
 
   const countdown = useCountdown(
@@ -94,25 +92,24 @@ export default function VotePage() {
 
   const handleConnect = async () => {
     try {
-      const addr = await connectWallet();
-      setWallet(addr);
+      await connect();
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Wallet connection failed");
     }
   };
 
   const handleVote = async () => {
-    if (!wallet || !selected || !pool) return;
+    if (!address || !selected || !pool) return;
     setVoting(true);
     setError(null);
     try {
       const salt = generateSalt();
-      const commitment = await computeCommitment(selected, wallet, salt);
+      const commitment = await computeCommitment(selected, address, salt);
 
       const res = await fetch("/api/pool/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voter: wallet, commitment, echoesAmount }),
+        body: JSON.stringify({ voter: address, commitment, echoesAmount }),
       });
 
       if (!res.ok) throw new Error((await res.json()).error);
@@ -128,7 +125,7 @@ export default function VotePage() {
   };
 
   const handleReveal = async () => {
-    if (!wallet || !pool) return;
+    if (!address || !pool) return;
     setRevealing(true);
     setError(null);
 
@@ -151,7 +148,7 @@ export default function VotePage() {
       const res = await fetch("/api/pool/reveal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ voter: wallet, storyId: revealedStory, salt }),
+        body: JSON.stringify({ voter: address, storyId: revealedStory, salt }),
       });
       if (!res.ok) throw new Error((await res.json()).error);
       setRevealed(true);
@@ -238,12 +235,12 @@ export default function VotePage() {
         )}
 
         {/* Wallet connect */}
-        {!wallet && (
+        {!address && (
           <button
             onClick={handleConnect}
             className="w-full py-3 mb-6 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold transition-colors"
           >
-            Connect Phantom to bet
+            Connect wallet to bet
           </button>
         )}
 
@@ -256,7 +253,7 @@ export default function VotePage() {
             return (
               <button
                 key={entry.storyId}
-                disabled={pool.phase !== "voting" || voted || !wallet}
+                disabled={pool.phase !== "voting" || voted || !address}
                 onClick={() => setSelected(isSelected ? null : entry.storyId)}
                 className={`p-5 rounded-2xl border-2 text-left transition-colors w-full ${
                   isWinner
@@ -302,7 +299,7 @@ export default function VotePage() {
                     </div>
                   </div>
 
-                  {pool.phase === "voting" && !voted && wallet && (
+                  {pool.phase === "voting" && !voted && address && (
                     <div
                       className={`w-5 h-5 rounded-full border-2 flex-shrink-0 mt-1 ${
                         isSelected
@@ -324,7 +321,7 @@ export default function VotePage() {
         </div>
 
         {/* Bet action */}
-        {pool.phase === "voting" && wallet && !voted && (
+        {pool.phase === "voting" && address && !voted && (
           <div className="p-5 rounded-2xl bg-neutral-900 border border-neutral-800">
             <div className="flex items-center justify-between mb-4">
               <label className="text-sm text-neutral-300">$ECHOES to bet</label>
@@ -375,7 +372,7 @@ export default function VotePage() {
           </div>
         )}
 
-        {pool.phase === "reveal" && wallet && !revealed && (
+        {pool.phase === "reveal" && address && !revealed && (
           <button
             onClick={handleReveal}
             disabled={revealing}

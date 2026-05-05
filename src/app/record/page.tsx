@@ -4,20 +4,14 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import AudioRecorder from "@/components/AudioRecorder";
 import { Story, StoryCategory, PublishGate } from "@/lib/types";
-import { saveStory } from "@/lib/store";
+import { upsertStory } from "@/lib/db";
 import { uploadAudioToR2 } from "@/lib/upload";
-import { getConnectedWallet } from "@/lib/wallet";
-import { ArrowLeft, DollarSign, Users, Loader2 } from "lucide-react";
+import { useWallet } from "@/hooks/useWallet";
+import { ArrowLeft, DollarSign, Users, Loader2, AlertCircle } from "lucide-react";
 import Link from "next/link";
 
 const CATEGORIES: StoryCategory[] = [
-  "War",
-  "Love",
-  "Immigration",
-  "Entrepreneurship",
-  "Family",
-  "Survival",
-  "Other",
+  "War", "Love", "Immigration", "Entrepreneurship", "Family", "Survival", "Other",
 ];
 
 type Step = "record" | "details" | "gate";
@@ -32,6 +26,8 @@ export default function RecordPage() {
   const [category, setCategory] = useState<StoryCategory>("Other");
   const [gate, setGate] = useState<PublishGate>("evaluate");
   const [submitting, setSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const { address } = useWallet();
 
   const handleRecordingComplete = useCallback(
     (blob: Blob, duration: number) => {
@@ -51,14 +47,17 @@ export default function RecordPage() {
   const handleSubmit = async () => {
     if (!audioBlob) return;
     setSubmitting(true);
+    setUploadError("");
 
-    let audioUrl = URL.createObjectURL(audioBlob);
+    let audioUrl: string;
     try {
       const result = await uploadAudioToR2(audioBlob);
       audioUrl = result.url;
     } catch (err) {
-      // Fall back to local blob URL if R2 not configured yet
-      console.warn("R2 upload skipped, using local blob URL:", err);
+      console.error("R2 upload failed:", err);
+      setUploadError("Upload failed — please check your connection and try again.");
+      setSubmitting(false);
+      return;
     }
 
     const story: Story = {
@@ -70,36 +69,41 @@ export default function RecordPage() {
       durationSeconds: audioDuration,
       publishGate: gate,
       createdAt: Date.now(),
-      // pay gate goes straight to tokenize; evaluate gate waits for 3 reviews
-      status: gate === "pay" ? "listed" : "pending_eval",
-      authorWallet: getConnectedWallet() ?? undefined,
+      status: gate === "pay" ? "draft" : "pending_eval",
+      authorWallet: address ?? undefined,
     };
 
-    saveStory(story);
+    try {
+      await upsertStory(story);
+    } catch (err) {
+      console.error("Failed to save story:", err);
+    }
 
     if (gate === "evaluate") {
       router.push("/evaluate");
     } else {
-      // listing page handles the $1 ECHOES payment → story goes live
       router.push(`/list/${story.id}`);
     }
   };
 
+  const stepNum = step === "record" ? 1 : step === "details" ? 2 : 3;
+
   return (
-    <div className="min-h-screen bg-neutral-950 text-white">
+    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
       <div className="max-w-xl mx-auto px-4 py-10">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-10">
+        <div className="flex items-center gap-4 mb-8">
           <Link
             href="/"
-            className="p-2 rounded-full hover:bg-neutral-800 transition-colors text-neutral-400"
+            className="p-2 rounded-full transition-colors"
+            style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.07)", color: "var(--text-2)" }}
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold">Record your story</h1>
-            <p className="text-sm text-neutral-500">
-              Step {step === "record" ? 1 : step === "details" ? 2 : 3} of 3
+            <h1 className="text-2xl font-bold" style={{ color: "var(--text-1)" }}>Record your story</h1>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>
+              Step {stepNum} of 3
             </p>
           </div>
         </div>
@@ -109,14 +113,15 @@ export default function RecordPage() {
           {(["record", "details", "gate"] as Step[]).map((s, i) => (
             <div
               key={s}
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                s === step
-                  ? "bg-amber-500"
-                  : i <
-                      ["record", "details", "gate"].indexOf(step)
-                    ? "bg-amber-800"
-                    : "bg-neutral-800"
-              }`}
+              className="h-1 flex-1 rounded-full transition-colors"
+              style={{
+                background:
+                  s === step
+                    ? "linear-gradient(90deg, #00c6be, #ff6b9d)"
+                    : i < ["record", "details", "gate"].indexOf(step)
+                    ? "rgba(245,158,11,0.4)"
+                    : "rgba(0,0,0,0.08)",
+              }}
             />
           ))}
         </div>
@@ -130,7 +135,7 @@ export default function RecordPage() {
         {step === "details" && (
           <form onSubmit={handleDetailsSubmit} className="flex flex-col gap-6">
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-2)" }}>
                 Story title
               </label>
               <input
@@ -140,12 +145,17 @@ export default function RecordPage() {
                 placeholder="Give your story a title…"
                 maxLength={80}
                 required
-                className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500 transition-colors"
+                className="w-full px-4 py-3 rounded-xl text-sm transition-colors focus:outline-none"
+                style={{
+                  background: "rgba(255,255,255,0.7)",
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  color: "var(--text-1)",
+                }}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-2)" }}>
                 Category
               </label>
               <div className="flex flex-wrap gap-2">
@@ -154,11 +164,12 @@ export default function RecordPage() {
                     key={c}
                     type="button"
                     onClick={() => setCategory(c)}
-                    className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    className="px-4 py-2 rounded-full text-sm font-medium transition-colors"
+                    style={
                       category === c
-                        ? "bg-amber-500 text-black"
-                        : "bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
-                    }`}
+                        ? { background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }
+                        : { background: "rgba(255,255,255,0.6)", border: "1px solid rgba(0,0,0,0.08)", color: "var(--text-2)" }
+                    }
                   >
                     {c}
                   </button>
@@ -167,9 +178,9 @@ export default function RecordPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-neutral-300 mb-2">
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-2)" }}>
                 Description
-                <span className="text-neutral-600 font-normal ml-2">
+                <span className="font-normal ml-2" style={{ color: "var(--text-3)" }}>
                   (what is this story about?)
                 </span>
               </label>
@@ -180,16 +191,22 @@ export default function RecordPage() {
                 rows={4}
                 maxLength={500}
                 required
-                className="w-full px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-800 text-white placeholder-neutral-600 focus:outline-none focus:border-amber-500 transition-colors resize-none"
+                className="w-full px-4 py-3 rounded-xl text-sm transition-colors focus:outline-none resize-none"
+                style={{
+                  background: "rgba(255,255,255,0.7)",
+                  border: "1px solid rgba(0,0,0,0.1)",
+                  color: "var(--text-1)",
+                }}
               />
-              <p className="text-xs text-neutral-600 mt-1 text-right">
+              <p className="text-xs mt-1 text-right" style={{ color: "var(--text-3)" }}>
                 {description.length}/500
               </p>
             </div>
 
             <button
               type="submit"
-              className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold transition-colors"
+              className="w-full py-3 rounded-xl font-semibold transition-colors"
+              style={{ background: "var(--amber)", color: "#000" }}
             >
               Continue
             </button>
@@ -199,28 +216,31 @@ export default function RecordPage() {
         {/* Step 3: Publish gate */}
         {step === "gate" && (
           <div className="flex flex-col gap-6">
-            <p className="text-neutral-400 text-sm">
+            <p className="text-sm" style={{ color: "var(--text-2)" }}>
               How do you want to publish{" "}
-              <span className="text-white font-medium">&ldquo;{title}&rdquo;</span>?
+              <span className="font-semibold" style={{ color: "var(--text-1)" }}>&ldquo;{title}&rdquo;</span>?
             </p>
 
             <div className="flex flex-col gap-3">
               {/* Pay option */}
               <button
                 onClick={() => setGate("pay")}
-                className={`p-5 rounded-2xl border-2 text-left transition-colors ${
-                  gate === "pay"
-                    ? "border-amber-500 bg-amber-500/10"
-                    : "border-neutral-800 bg-neutral-900 hover:border-neutral-600"
-                }`}
+                className="p-5 rounded-2xl text-left transition-colors"
+                style={{
+                  border: gate === "pay" ? "2px solid var(--amber)" : "2px solid rgba(0,0,0,0.07)",
+                  background: gate === "pay" ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.6)",
+                }}
               >
                 <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-xl bg-amber-500/20">
-                    <DollarSign className="w-5 h-5 text-amber-400" />
+                  <div
+                    className="p-2 rounded-xl flex-shrink-0"
+                    style={{ background: "rgba(245,158,11,0.12)" }}
+                  >
+                    <DollarSign className="w-5 h-5" style={{ color: "var(--amber)" }} />
                   </div>
                   <div>
-                    <p className="font-semibold">Pay $1 to list</p>
-                    <p className="text-sm text-neutral-400 mt-1">
+                    <p className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>Pay $1 to list</p>
+                    <p className="text-sm mt-1" style={{ color: "var(--text-2)" }}>
                       $1 in $ECHOES tokens — your story is listed immediately
                       and enters the weekly vote pool.
                     </p>
@@ -231,19 +251,22 @@ export default function RecordPage() {
               {/* Evaluate option */}
               <button
                 onClick={() => setGate("evaluate")}
-                className={`p-5 rounded-2xl border-2 text-left transition-colors ${
-                  gate === "evaluate"
-                    ? "border-amber-500 bg-amber-500/10"
-                    : "border-neutral-800 bg-neutral-900 hover:border-neutral-600"
-                }`}
+                className="p-5 rounded-2xl text-left transition-colors"
+                style={{
+                  border: gate === "evaluate" ? "2px solid var(--amber)" : "2px solid rgba(0,0,0,0.07)",
+                  background: gate === "evaluate" ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.6)",
+                }}
               >
                 <div className="flex items-start gap-4">
-                  <div className="p-2 rounded-xl bg-neutral-700">
-                    <Users className="w-5 h-5 text-neutral-300" />
+                  <div
+                    className="p-2 rounded-xl flex-shrink-0"
+                    style={{ background: "rgba(0,0,0,0.05)" }}
+                  >
+                    <Users className="w-5 h-5" style={{ color: "var(--text-2)" }} />
                   </div>
                   <div>
-                    <p className="font-semibold">Evaluate 3 stories instead</p>
-                    <p className="text-sm text-neutral-400 mt-1">
+                    <p className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>Evaluate 3 stories instead</p>
+                    <p className="text-sm mt-1" style={{ color: "var(--text-2)" }}>
                       Listen to 80% of 3 stories and rate them. Free — your
                       story gets listed and enters the weekly vote pool.
                     </p>
@@ -252,10 +275,21 @@ export default function RecordPage() {
               </button>
             </div>
 
+            {uploadError && (
+              <div
+                className="flex items-start gap-2 p-3 rounded-xl text-sm"
+                style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.25)", color: "#dc2626" }}
+              >
+                <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                {uploadError}
+              </div>
+            )}
+
             <button
               onClick={handleSubmit}
               disabled={submitting}
-              className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-50 text-black rounded-xl font-semibold transition-colors"
+              className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
+              style={{ background: "var(--amber)", color: "#000" }}
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">

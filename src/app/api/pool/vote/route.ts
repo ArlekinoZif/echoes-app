@@ -6,8 +6,11 @@ import { getStakedSKR } from "@/lib/rpc";
 const MIN_STAKED_SKR = 1;
 
 export async function POST(req: NextRequest) {
-  const { voter, commitment, skrAmount } = await req.json();
-  if (!voter || !commitment || !skrAmount) {
+  const body = await req.json();
+  const { voter, commitment } = body;
+  // Accept both echoesAmount (new) and skrAmount (legacy) field names
+  const amount: number = body.echoesAmount ?? body.skrAmount;
+  if (!voter || !commitment || !amount) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
 
@@ -21,9 +24,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Already voted" }, { status: 409 });
   }
 
-  if (skrAmount < pool.skrVoteCost) {
+  if (amount < pool.skrVoteCost) {
     return NextResponse.json(
-      { error: `Minimum ${pool.skrVoteCost} SKR required` },
+      { error: `Minimum ${pool.skrVoteCost} $ECHOES required` },
       { status: 400 }
     );
   }
@@ -41,7 +44,7 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  pool.ballots.push({ voter, commitment, skrAmount, revealed: false });
+  pool.ballots.push({ voter, commitment, skrAmount: amount, revealed: false });
 
   return NextResponse.json({ ok: true, totalVotes: pool.ballots.length });
 }

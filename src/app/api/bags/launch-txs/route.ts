@@ -1,48 +1,57 @@
 /**
- * Step 2 of Bags token launch: get unsigned launch transactions.
- * The client signs + sends these with Phantom.
+ * Step 3 of Bags token launch: create the signed launch transaction.
+ * Requires the meteoraConfigKey (configKey) from the fee-config step.
  *
  * POST /api/bags/launch-txs
- * Body: { tokenInfoId, creatorWallet }
- * Returns: { transactions: string[], mint: string }
- *   transactions — base64-encoded unsigned Solana transactions
- *   mint         — the token mint address (may be empty until first tx confirms)
+ * Body: { tokenMint, tokenMetadata, wallet, configKey, initialBuyLamports? }
+ * Returns: { transaction: string (base64) }
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import bs58 from "bs58";
 
 const BAGS_API_URL =
   process.env.BAGS_API_URL ?? "https://public-api-v2.bags.fm/api/v1";
 const BAGS_API_KEY = process.env.BAGS_API_KEY ?? "";
-const BAGS_REF = process.env.BAGS_REF ?? "sirhitalk";
 
 export async function POST(req: NextRequest) {
   try {
-    const { tokenInfoId, creatorWallet } = await req.json();
+    const {
+      tokenMint,
+      tokenMetadata,
+      wallet,
+      configKey,
+      initialBuyLamports = 0,
+    } = await req.json();
 
-    if (!tokenInfoId || !creatorWallet) {
+    if (!tokenMint || !tokenMetadata || !wallet || !configKey) {
       return NextResponse.json(
-        { error: "tokenInfoId and creatorWallet are required" },
+        { error: "tokenMint, tokenMetadata, wallet and configKey are required" },
         { status: 400 }
       );
     }
 
-    const res = await fetch(`${BAGS_API_URL}/launch`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": BAGS_API_KEY,
-      },
-      body: JSON.stringify({
-        tokenInfoId,
-        creatorWallet,
-        ref: BAGS_REF,
-      }),
-    });
+    const res = await fetch(
+      `${BAGS_API_URL}/token-launch/create-launch-transaction`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": BAGS_API_KEY,
+        },
+        body: JSON.stringify({
+          ipfs: tokenMetadata,
+          tokenMint,
+          wallet,
+          initialBuyLamports,
+          configKey,
+        }),
+      }
+    );
 
     if (!res.ok) {
       const text = await res.text();
-      console.error("Bags /launch error:", res.status, text);
+      console.error("Bags create-launch-transaction error:", res.status, text);
       return NextResponse.json(
         { error: `Bags API error ${res.status}: ${text}` },
         { status: 502 }
@@ -50,16 +59,18 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
+    if (!data.success) {
+      return NextResponse.json(
+        { error: data.error ?? "Launch transaction failed" },
+        { status: 502 }
+      );
+    }
 
-    // Normalise: Bags may use different shapes
-    const transactions: string[] =
-      data.transactions ??
-      data.unsignedTransactions ??
-      (data.transaction ? [data.transaction] : []);
-    const mint: string =
-      data.mint ?? data.mintAddress ?? data.token_mint ?? "";
+    // response is a base58-encoded transaction string
+    const txBase58: string = data.response;
+    const txBase64 = Buffer.from(bs58.decode(txBase58)).toString("base64");
 
-    return NextResponse.json({ transactions, mint });
+    return NextResponse.json({ transaction: txBase64 });
   } catch (err) {
     console.error("bags/launch-txs error:", err);
     return NextResponse.json({ error: "Internal error" }, { status: 500 });
