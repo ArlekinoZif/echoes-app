@@ -9,15 +9,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (!ready) {
     return (
       <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 200,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          background: "var(--bg)",
-        }}
+        className="min-h-screen flex items-center justify-center"
+        style={{ background: "var(--bg)" }}
       >
         <Loader2 className="w-6 h-6 animate-spin" style={{ color: "var(--text-3)" }} />
       </div>
@@ -27,16 +20,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   if (!authenticated) {
     return (
       <div
-        style={{
-          position: "fixed",
-          inset: 0,
-          zIndex: 200,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          padding: "24px",
-          background: "var(--bg)",
-        }}
+        className="min-h-screen flex items-center justify-center"
+        style={{ padding: "24px", background: "var(--bg)" }}
       >
         <div
           className="w-full max-w-xs flex flex-col items-center gap-6 text-center"
