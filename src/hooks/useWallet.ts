@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy, useWallets } from "@privy-io/react-auth";
+import { usePrivy, useWallets, getEmbeddedConnectedWallet, useCreateWallet } from "@privy-io/react-auth";
 import { Transaction, Connection } from "@solana/web3.js";
 
 const RPC_URL =
@@ -9,15 +9,22 @@ const RPC_URL =
 export function useWallet() {
   const { ready, authenticated, login, logout } = usePrivy();
   const { wallets } = useWallets();
+  const { createWallet } = useCreateWallet();
 
-  // Pick the first Solana wallet
+  const embedded = getEmbeddedConnectedWallet(wallets);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const solanaWallet = wallets.find((w) => (w as any).chainType === "solana") ?? null;
+  const external = wallets.find((w) => (w as any).chainType === "solana" && (w as any).walletClientType !== "privy") ?? null;
+  const solanaWallet = embedded ?? external ?? null;
   const address = solanaWallet?.address ?? null;
 
   async function connect(): Promise<string> {
-    if (!authenticated) await login();
-    // After login Privy auto-creates embedded wallet; wallets updates reactively
+    if (!authenticated) {
+      await login();
+      return address ?? "";
+    }
+    if (!address) {
+      try { await createWallet(); } catch { /* already exists */ }
+    }
     return address ?? "";
   }
 
