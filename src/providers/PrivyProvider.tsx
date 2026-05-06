@@ -12,7 +12,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
       config={{
         appearance: {
           theme: "dark",
-          accentColor: "#f59e0b",
+          accentColor: "#00c6be",
           walletChainType: "solana-only",
         },
         loginMethods: ["email", "wallet", "google", "twitter"],
