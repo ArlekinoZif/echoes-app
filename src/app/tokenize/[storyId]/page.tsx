@@ -274,11 +274,11 @@ export default function TokenizePage({
                       className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                       style={
                         isPast
-                          ? { background: "var(--amber)", color: "#000" }
+                          ? { background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }
                           : isError
                           ? { background: "rgba(239,68,68,0.15)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }
                           : isCurrent
-                          ? { background: "rgba(245,158,11,0.12)", color: "var(--amber)", border: "1px solid rgba(245,158,11,0.3)" }
+                          ? { background: "rgba(255,107,157,0.12)", color: "#ff6b9d", border: "1px solid rgba(255,107,157,0.3)" }
                           : { background: "rgba(0,0,0,0.05)", color: "var(--text-3)" }
                       }
                     >
@@ -312,7 +312,7 @@ export default function TokenizePage({
                   <button
                     onClick={handleConnectWallet}
                     className="mt-4 w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
-                    style={{ background: "var(--amber)", color: "#000" }}
+                    style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                   >
                     Connect wallet
                   </button>
@@ -383,7 +383,7 @@ export default function TokenizePage({
                     <button
                       type="submit"
                       className="w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
-                      style={{ background: "var(--amber)", color: "#000" }}
+                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                     >
                       Launch on Bags →
                     </button>
@@ -421,7 +421,7 @@ export default function TokenizePage({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                  style={{ background: "var(--amber)", color: "#000" }}
+                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                 >
                   <ExternalLink className="w-4 h-4" /> Trade on Bags App
                 </a>

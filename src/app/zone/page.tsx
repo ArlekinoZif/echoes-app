@@ -250,7 +250,7 @@ export default function PatioPage() {
                     <Link
                       href={`/tokenize/${s.id}`}
                       className="flex-shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors"
-                      style={{ background: "var(--amber)", color: "#000" }}
+                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                     >
                       Tokenize
                     </Link>

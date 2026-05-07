@@ -123,7 +123,7 @@ export default function EvaluatePage() {
             <Link
               href="/"
               className="mt-2 px-6 py-3 rounded-full font-semibold transition-colors"
-              style={{ background: "var(--amber)", color: "#000" }}
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               Back to Library
             </Link>
@@ -248,7 +248,7 @@ export default function EvaluatePage() {
                     <Link
                       href={`/tokenize/${story.id}?sponsor=1`}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                      style={{ background: "var(--amber)", color: "#000" }}
+                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                     >
                       <Zap className="w-3 h-3" /> Sponsor &amp; tokenize
                     </Link>

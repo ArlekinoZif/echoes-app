@@ -141,7 +141,8 @@ export default function DashboardPage() {
             </div>
             <button
               onClick={handleConnect}
-              className="px-6 py-3 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold transition-colors"
+              className="px-6 py-3 rounded-xl font-semibold transition-opacity hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               Connect wallet
             </button>
@@ -173,7 +174,8 @@ export default function DashboardPage() {
                   href="https://seeker.app"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-black rounded-xl text-xs font-semibold transition-colors flex-shrink-0"
+                  className="px-4 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90 flex-shrink-0"
+                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                 >
                   Stake →
                 </a>

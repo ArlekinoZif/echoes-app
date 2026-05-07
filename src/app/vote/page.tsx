@@ -238,7 +238,8 @@ export default function VotePage() {
         {!address && (
           <button
             onClick={handleConnect}
-            className="w-full py-3 mb-6 bg-amber-500 hover:bg-amber-400 text-black rounded-xl font-semibold transition-colors"
+            className="w-full py-3 mb-6 rounded-xl font-semibold transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
           >
             Connect wallet to bet
           </button>
@@ -336,9 +337,10 @@ export default function VotePage() {
                   onClick={() => setEchoesAmount(amt)}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
                     echoesAmount === amt
-                      ? "bg-amber-500 text-black"
+                      ? "text-white"
                       : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
                   }`}
+                  style={echoesAmount === amt ? { background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)" } : {}}
                 >
                   {amt}
                 </button>
@@ -347,7 +349,8 @@ export default function VotePage() {
             <button
               onClick={handleVote}
               disabled={!selected || voting}
-              className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:cursor-not-allowed text-black rounded-xl font-semibold transition-colors"
+              className="w-full py-3 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-semibold transition-opacity hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               {voting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -376,7 +379,8 @@ export default function VotePage() {
           <button
             onClick={handleReveal}
             disabled={revealing}
-            className="w-full py-3 bg-amber-500 hover:bg-amber-400 disabled:opacity-40 text-black rounded-xl font-semibold transition-colors"
+            className="w-full py-3 disabled:opacity-40 rounded-xl font-semibold transition-opacity hover:opacity-90"
+            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
           >
             {revealing ? (
               <span className="flex items-center justify-center gap-2">

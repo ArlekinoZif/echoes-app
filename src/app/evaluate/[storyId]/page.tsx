@@ -30,7 +30,7 @@ function StarRating({ label, value, onChange, disabled }: StarRatingProps) {
             className="w-10 h-10 rounded-xl text-lg transition-colors disabled:cursor-not-allowed"
             style={
               star <= value
-                ? { background: "var(--amber)", color: "#000" }
+                ? { background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }
                 : { background: "rgba(0,0,0,0.06)", color: "var(--text-3)" }
             }
           >
@@ -217,7 +217,7 @@ export default function EvaluateStoryPage({
             onClick={handleSubmit}
             disabled={!canSubmit || submitted}
             className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-            style={{ background: "var(--amber)", color: "#000" }}
+            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
           >
             {submitted ? "Saved!" : "Submit evaluation"}
           </button>

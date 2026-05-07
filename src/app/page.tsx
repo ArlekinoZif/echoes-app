@@ -115,7 +115,7 @@ function StoryCard({
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
-            style={{ background: "var(--amber)", color: "#000" }}
+            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
           >
             <ExternalLink className="w-3 h-3" /> Trade on Bags
           </a>

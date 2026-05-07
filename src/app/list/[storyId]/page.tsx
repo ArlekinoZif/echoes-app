@@ -164,7 +164,7 @@ export default function ListPage({
               onClick={handleConnect}
               disabled={loading}
               className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
-              style={{ background: "var(--amber)", color: "#000" }}
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -240,7 +240,7 @@ export default function ListPage({
                     className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-colors"
                     style={
                       copied
-                        ? { background: "rgba(245,158,11,0.15)", color: "var(--amber)" }
+                        ? { background: "rgba(255,107,157,0.15)", color: "#ff6b9d" }
                         : { background: "rgba(0,0,0,0.05)", color: "var(--text-2)" }
                     }
                   >
@@ -254,7 +254,7 @@ export default function ListPage({
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80"
-                  style={{ background: "var(--amber)", color: "#000" }}
+                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                 >
                   <ExternalLink className="w-3 h-3" /> Get $ECHOES on Bags App
                 </a>
@@ -265,7 +265,7 @@ export default function ListPage({
               onClick={handlePay}
               disabled={loading}
               className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
-              style={{ background: "var(--amber)", color: "#000" }}
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -322,7 +322,7 @@ export default function ListPage({
             <Link
               href="/"
               className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold transition-colors"
-              style={{ background: "var(--amber)", color: "#000" }}
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               Back to Library
             </Link>

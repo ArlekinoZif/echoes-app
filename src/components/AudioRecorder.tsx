@@ -182,7 +182,7 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
             <button
               onClick={confirm}
               className="px-6 py-3 rounded-full font-semibold transition-colors"
-              style={{ background: "var(--amber)", color: "#000" }}
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               Use this recording
             </button>
