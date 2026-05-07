@@ -16,7 +16,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           walletChainType: "solana-only",
         },
         loginMethodsAndOrder: {
-          primary: ["phantom", "backpack", "solflare", "detected_solana_wallets"],
+          primary: ["phantom", "backpack", "solflare"],
           overflow: ["email", "google", "twitter"],
         },
         embeddedWallets: {
