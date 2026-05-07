@@ -120,6 +120,15 @@ function StoryCard({
             <ExternalLink className="w-3 h-3" /> Trade on Bags
           </a>
         )}
+        {story.status === "listed" && !story.tokenMint && story.authorWallet === wallet && (
+          <Link
+            href={`/tokenize/${story.id}`}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
+            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+          >
+            <Zap className="w-3 h-3" /> Tokenize
+          </Link>
+        )}
         {canSponsor && (
           <Link
             href={`/tokenize/${story.id}?sponsor=1`}
@@ -130,7 +139,7 @@ function StoryCard({
               border: "1px solid var(--border)",
             }}
           >
-            <Zap className="w-3 h-3" style={{ color: "var(--amber)" }} />
+            <Zap className="w-3 h-3" style={{ color: "#ff6b9d" }} />
             Sponsor
           </Link>
         )}

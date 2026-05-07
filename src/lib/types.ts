@@ -30,6 +30,9 @@ export interface Story {
   // Set after listing (pay gate completes)
   listingTxSig?: string;
 
+  // Cover image (optional, uploaded at record time)
+  coverImageUrl?: string;
+
   // Set after tokenization
   ticker?: string;
   tokenMint?: string;

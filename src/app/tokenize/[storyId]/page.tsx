@@ -74,6 +74,7 @@ export default function TokenizePage({
     fetchStory(storyId).then((s) => {
       if (!s) { router.push("/"); return; }
       setStory(s);
+      if (s.coverImageUrl) setCoverPreview(s.coverImageUrl);
       if (authenticated && address) {
         setStep("wallet", { status: "done", detail: address.slice(0, 6) + "…" + address.slice(-4) });
         setCurrentStep("details");
@@ -113,9 +114,10 @@ export default function TokenizePage({
     if (!story || !address) return;
     setStep("launch", { status: "loading" });
     try {
-      // 1. Cover image (optional)
+      // 1. Cover image — use stored URL if available, otherwise encode uploaded file
+      let imageUrl: string | undefined = story.coverImageUrl;
       let imageBase64: string | undefined;
-      if (coverImage) {
+      if (!imageUrl && coverImage) {
         imageBase64 = await new Promise((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (ev) => resolve(ev.target?.result as string);
@@ -132,6 +134,7 @@ export default function TokenizePage({
           name: story.title,
           symbol: ticker.toUpperCase(),
           description: story.description,
+          imageUrl,
           imageBase64,
         }),
       });

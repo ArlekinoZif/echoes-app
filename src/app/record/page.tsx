@@ -5,10 +5,11 @@ import { useRouter } from "next/navigation";
 import AudioRecorder from "@/components/AudioRecorder";
 import { Story, StoryCategory, PublishGate } from "@/lib/types";
 import { upsertStory } from "@/lib/db";
-import { uploadAudioToR2 } from "@/lib/upload";
+import { uploadAudioToR2, uploadImageToR2 } from "@/lib/upload";
 import { useWallet } from "@/hooks/useWallet";
-import { ArrowLeft, DollarSign, Users, Loader2, AlertCircle } from "lucide-react";
+import { ArrowLeft, DollarSign, Users, Loader2, AlertCircle, ImageIcon, X } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 
 const CATEGORIES: StoryCategory[] = [
   "War", "Love", "Immigration", "Entrepreneurship", "Family", "Survival", "Other",
@@ -25,9 +26,23 @@ export default function RecordPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<StoryCategory>("Other");
   const [gate, setGate] = useState<PublishGate>("evaluate");
+  const [coverImage, setCoverImage] = useState<File | null>(null);
+  const [coverPreview, setCoverPreview] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const { address } = useWallet();
+
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCoverImage(file);
+    setCoverPreview(URL.createObjectURL(file));
+  }
+
+  function removeCover() {
+    setCoverImage(null);
+    setCoverPreview("");
+  }
 
   const handleRecordingComplete = useCallback(
     (blob: Blob, duration: number) => {
@@ -60,6 +75,16 @@ export default function RecordPage() {
       return;
     }
 
+    let coverImageUrl: string | undefined;
+    if (coverImage) {
+      try {
+        const result = await uploadImageToR2(coverImage);
+        coverImageUrl = result.url;
+      } catch (err) {
+        console.error("Cover image upload failed:", err);
+      }
+    }
+
     const story: Story = {
       id: crypto.randomUUID(),
       title: title.trim(),
@@ -71,6 +96,7 @@ export default function RecordPage() {
       createdAt: Date.now(),
       status: gate === "pay" ? "draft" : "pending_eval",
       authorWallet: address ?? undefined,
+      coverImageUrl,
     };
 
     try {
@@ -134,6 +160,44 @@ export default function RecordPage() {
         {/* Step 2: Details */}
         {step === "details" && (
           <form onSubmit={handleDetailsSubmit} className="flex flex-col gap-6">
+
+            {/* Cover image */}
+            <div>
+              <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-2)" }}>
+                Cover image
+                <span className="font-normal ml-2" style={{ color: "var(--text-3)" }}>(optional)</span>
+              </label>
+              {coverPreview ? (
+                <div className="relative w-full aspect-video rounded-xl overflow-hidden">
+                  <Image src={coverPreview} alt="Cover" fill className="object-cover" />
+                  <button
+                    type="button"
+                    onClick={removeCover}
+                    className="absolute top-2 right-2 p-1.5 rounded-full"
+                    style={{ background: "rgba(0,0,0,0.5)", color: "#fff" }}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ) : (
+                <label
+                  className="flex flex-col items-center justify-center gap-2 w-full py-8 rounded-xl cursor-pointer transition-colors"
+                  style={{ border: "2px dashed rgba(0,0,0,0.1)", background: "rgba(255,255,255,0.5)" }}
+                >
+                  <ImageIcon className="w-6 h-6" style={{ color: "var(--text-3)" }} />
+                  <span className="text-sm" style={{ color: "var(--text-3)" }}>
+                    Tap to upload or paste an image
+                  </span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleCoverChange}
+                  />
+                </label>
+              )}
+            </div>
+
             <div>
               <label className="block text-sm font-medium mb-2" style={{ color: "var(--text-2)" }}>
                 Story title
