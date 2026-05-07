@@ -36,15 +36,12 @@ const PLATFORM_WALLET = new PublicKey(
 const ECHOES_DECIMALS = 6; // adjust if different
 const LISTING_FEE_USD = 1;
 
-/** Fetch the USD price of 1 ECHOES token from Jupiter */
+/** Fetch the USD price of 1 ECHOES token via our server-side proxy */
 async function getEchoesPriceUsd(): Promise<number> {
-  const res = await fetch(
-    `https://api.jup.ag/price/v2?ids=${ECHOES_MINT.toString()}`
-  );
-  if (!res.ok) throw new Error("Failed to fetch ECHOES price from Jupiter");
-  const json = await res.json();
-  const price: number = parseFloat(json.data?.[ECHOES_MINT.toString()]?.price);
-  if (!price) throw new Error("ECHOES price not found in Jupiter response");
+  const res = await fetch("/api/echoes-price");
+  if (!res.ok) throw new Error("Failed to fetch ECHOES price");
+  const { price } = await res.json();
+  if (!price) throw new Error("ECHOES price not found");
   return price;
 }
 
