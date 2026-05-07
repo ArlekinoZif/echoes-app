@@ -19,6 +19,7 @@ import {
   getAssociatedTokenAddressSync,
   createTransferInstruction,
   TOKEN_PROGRAM_ID,
+  TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   createAssociatedTokenAccountInstruction,
 } from "@solana/spl-token";
@@ -60,21 +61,25 @@ export async function payListingFee(
   const amountTokens = LISTING_FEE_USD / priceUsd;
   const rawAmount = BigInt(Math.ceil(amountTokens * 10 ** ECHOES_DECIMALS));
 
-  // 2. Derive ATAs
-  const sender = new PublicKey(senderWallet);
-  const senderAta = getAssociatedTokenAddressSync(ECHOES_MINT, sender);
-  const platformAta = getAssociatedTokenAddressSync(
-    ECHOES_MINT,
-    PLATFORM_WALLET
-  );
-
   const connection = new Connection(rpcUrl, "confirmed");
+
+  // 2. Detect token program (Token vs Token-2022)
+  const mintInfo = await connection.getAccountInfo(ECHOES_MINT);
+  const tokenProgramId = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID)
+    ? TOKEN_2022_PROGRAM_ID
+    : TOKEN_PROGRAM_ID;
+
+  // 3. Derive ATAs
+  const sender = new PublicKey(senderWallet);
+  const senderAta = getAssociatedTokenAddressSync(ECHOES_MINT, sender, false, tokenProgramId);
+  const platformAta = getAssociatedTokenAddressSync(ECHOES_MINT, PLATFORM_WALLET, false, tokenProgramId);
+
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash();
 
   const instructions: TransactionInstruction[] = [];
 
-  // 3. Create platform ATA if it doesn't exist yet
+  // 4. Create platform ATA if it doesn't exist yet
   const platformAtaInfo = await connection.getAccountInfo(platformAta);
   if (!platformAtaInfo) {
     instructions.push(
@@ -83,13 +88,13 @@ export async function payListingFee(
         platformAta,
         PLATFORM_WALLET,
         ECHOES_MINT,
-        TOKEN_PROGRAM_ID,
+        tokenProgramId,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )
     );
   }
 
-  // 4. Transfer instruction
+  // 5. Transfer instruction
   instructions.push(
     createTransferInstruction(
       senderAta,
@@ -97,18 +102,18 @@ export async function payListingFee(
       sender,
       rawAmount,
       [],
-      TOKEN_PROGRAM_ID
+      tokenProgramId
     )
   );
 
-  // 5. Build transaction
+  // 6. Build transaction
   const tx = new Transaction({
     feePayer: sender,
     blockhash,
     lastValidBlockHeight,
   }).add(...instructions);
 
-  // 6. Sign + send
+  // 7. Sign + send
   const signed = await signTransaction(tx);
   const sig = await connection.sendRawTransaction(signed.serialize());
   await connection.confirmTransaction(
