@@ -39,11 +39,11 @@ const LISTING_FEE_USD = 1;
 /** Fetch the USD price of 1 ECHOES token from Jupiter */
 async function getEchoesPriceUsd(): Promise<number> {
   const res = await fetch(
-    `https://price.jup.ag/v6/price?ids=${ECHOES_MINT.toString()}`
+    `https://api.jup.ag/price/v2?ids=${ECHOES_MINT.toString()}`
   );
   if (!res.ok) throw new Error("Failed to fetch ECHOES price from Jupiter");
   const json = await res.json();
-  const price: number = json.data?.[ECHOES_MINT.toString()]?.price;
+  const price: number = parseFloat(json.data?.[ECHOES_MINT.toString()]?.price);
   if (!price) throw new Error("ECHOES price not found in Jupiter response");
   return price;
 }
