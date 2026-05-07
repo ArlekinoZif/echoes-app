@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Connection } from "@solana/web3.js";
 import { useWallet } from "@/hooks/useWallet";
+import { useConnectWallet } from "@privy-io/react-auth";
 import { fetchMyStories, fetchFavourites, fetchPublicStories } from "@/lib/db";
 import { Story } from "@/lib/types";
 import {
@@ -24,6 +25,7 @@ function shortAddr(addr: string) {
 
 export default function PatioPage() {
   const { authenticated, address, connect } = useWallet();
+  const { connectWallet } = useConnectWallet();
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -139,6 +141,13 @@ export default function PatioPage() {
                   ) : (
                     <Copy className="w-3.5 h-3.5" />
                   )}
+                </button>
+                <button
+                  onClick={() => connectWallet()}
+                  className="ml-auto text-xs px-2.5 py-1 rounded-lg transition-colors"
+                  style={{ background: "rgba(0,0,0,0.05)", color: "var(--text-3)", border: "1px solid rgba(0,0,0,0.07)" }}
+                >
+                  Change
                 </button>
               </div>
               {solBalance !== null && (
