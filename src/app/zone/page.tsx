@@ -51,25 +51,35 @@ export default function PatioPage() {
   }
 
   const ECHOES_MINT = "8F2N1Da9z1arxiFKmTzxaKoX1yUjJ2xKFQBxxMjQBAGS";
+  const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
+  const TOKEN_2022_PROGRAM = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
 
   async function fetchBalance(addr: string) {
     const conn = new Connection(RPC_URL, "confirmed");
     const pk = new PublicKey(addr);
+    const echoesMint = new PublicKey(ECHOES_MINT);
 
-    const [lamports, tokenAccounts] = await Promise.allSettled([
+    const [lamports, v1Accounts, v2Accounts] = await Promise.allSettled([
       conn.getBalance(pk),
-      conn.getParsedTokenAccountsByOwner(pk, { mint: new PublicKey(ECHOES_MINT) }),
+      conn.getParsedTokenAccountsByOwner(pk, { programId: TOKEN_PROGRAM }),
+      conn.getParsedTokenAccountsByOwner(pk, { programId: TOKEN_2022_PROGRAM }),
     ]);
 
     if (lamports.status === "fulfilled") setSolBalance(lamports.value / 1e9);
     else setSolBalance(null);
 
-    if (tokenAccounts.status === "fulfilled" && tokenAccounts.value.value.length > 0) {
-      const amount = tokenAccounts.value.value[0].account.data.parsed.info.tokenAmount.uiAmount as number;
-      setEchoesBalance(amount);
-    } else {
-      setEchoesBalance(0);
-    }
+    const allAccounts = [
+      ...(v1Accounts.status === "fulfilled" ? v1Accounts.value.value : []),
+      ...(v2Accounts.status === "fulfilled" ? v2Accounts.value.value : []),
+    ];
+
+    const echoesAccount = allAccounts.find(
+      (a) => a.account.data.parsed.info.mint === echoesMint.toBase58()
+    );
+    setEchoesBalance(echoesAccount
+      ? (echoesAccount.account.data.parsed.info.tokenAmount.uiAmount as number)
+      : 0
+    );
   }
 
   useEffect(() => {
