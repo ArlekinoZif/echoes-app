@@ -63,17 +63,18 @@ export default function PatioPage() {
       setSolBalance(lamports / 1e9);
     } catch { setSolBalance(null); }
 
-    // ECHOES — try classic SPL token program first, then Token-2022
-    let echoesAmount: number | null = null;
-    for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
-      try {
-        const ata = getAssociatedTokenAddressSync(ECHOES_MINT, pk, false, programId);
-        const bal = await conn.getTokenAccountBalance(ata);
-        echoesAmount = bal.value.uiAmount ?? 0;
-        break;
-      } catch { /* account doesn't exist under this program */ }
+    // ECHOES — detect which token program owns the mint, derive ATA, fetch balance
+    try {
+      const mintInfo = await conn.getAccountInfo(ECHOES_MINT);
+      const tokenProgramId = mintInfo?.owner.equals(TOKEN_2022_PROGRAM_ID)
+        ? TOKEN_2022_PROGRAM_ID
+        : TOKEN_PROGRAM_ID;
+      const ata = getAssociatedTokenAddressSync(ECHOES_MINT, pk, false, tokenProgramId);
+      const bal = await conn.getTokenAccountBalance(ata);
+      setEchoesBalance(bal.value.uiAmount ?? 0);
+    } catch {
+      setEchoesBalance(0);
     }
-    setEchoesBalance(echoesAmount ?? 0);
   }
 
   useEffect(() => {
