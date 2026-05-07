@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Connection } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { useWallet } from "@/hooks/useWallet";
 import { useConnectWallet } from "@privy-io/react-auth";
 import { fetchMyStories, fetchFavourites, fetchPublicStories } from "@/lib/db";
@@ -27,6 +27,7 @@ export default function PatioPage() {
   const { authenticated, address, connect } = useWallet();
   const { connectWallet } = useConnectWallet();
   const [solBalance, setSolBalance] = useState<number | null>(null);
+  const [echoesBalance, setEchoesBalance] = useState<number | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -49,15 +50,25 @@ export default function PatioPage() {
     setFavStories(pub.filter((s) => favSet.has(s.id)));
   }
 
+  const ECHOES_MINT = "8F2N1Da9z1arxiFKmTzxaKoX1yUjJ2xKFQBxxMjQBAGS";
+
   async function fetchBalance(addr: string) {
-    try {
-      const conn = new Connection(RPC_URL, "confirmed");
-      const lamports = await conn.getBalance(
-        { toBase58: () => addr } as Parameters<typeof conn.getBalance>[0]
-      );
-      setSolBalance(lamports / 1e9);
-    } catch {
-      setSolBalance(null);
+    const conn = new Connection(RPC_URL, "confirmed");
+    const pk = new PublicKey(addr);
+
+    const [lamports, tokenAccounts] = await Promise.allSettled([
+      conn.getBalance(pk),
+      conn.getParsedTokenAccountsByOwner(pk, { mint: new PublicKey(ECHOES_MINT) }),
+    ]);
+
+    if (lamports.status === "fulfilled") setSolBalance(lamports.value / 1e9);
+    else setSolBalance(null);
+
+    if (tokenAccounts.status === "fulfilled" && tokenAccounts.value.value.length > 0) {
+      const amount = tokenAccounts.value.value[0].account.data.parsed.info.tokenAmount.uiAmount as number;
+      setEchoesBalance(amount);
+    } else {
+      setEchoesBalance(0);
     }
   }
 
@@ -150,11 +161,18 @@ export default function PatioPage() {
                   Change
                 </button>
               </div>
-              {solBalance !== null && (
-                <p className="text-sm mt-1" style={{ color: "var(--text-3)" }}>
-                  {solBalance.toFixed(4)} SOL
-                </p>
-              )}
+              <div className="flex gap-4 mt-2">
+                {solBalance !== null && (
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                    <span style={{ color: "var(--text-2)" }}>{solBalance.toFixed(4)}</span> SOL
+                  </p>
+                )}
+                {echoesBalance !== null && (
+                  <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                    <span style={{ color: "var(--amber)" }}>{echoesBalance.toLocaleString()}</span> $ECHOES
+                  </p>
+                )}
+              </div>
             </div>
           ) : (
             <button
