@@ -23,7 +23,17 @@ const PLATFORM_WALLET =
   "7PfDfuoNKzQCCxpRB5B6NFXq6RhuszYYBzbyrLLKkNhB";
 
 function txToBase64(tx: unknown): string {
-  const raw = typeof tx === "string" ? tx : (tx as { tx: string }).tx;
+  console.log("txToBase64 input:", JSON.stringify(tx));
+  let raw: string;
+  if (typeof tx === "string") {
+    raw = tx;
+  } else if (tx && typeof tx === "object") {
+    const obj = tx as Record<string, unknown>;
+    raw = (obj.tx ?? obj.transaction ?? obj.data ?? obj.serializedTransaction ?? "") as string;
+  } else {
+    throw new Error(`Unexpected tx format: ${JSON.stringify(tx)}`);
+  }
+  if (!raw || typeof raw !== "string") throw new Error(`No string found in tx: ${JSON.stringify(tx)}`);
   return Buffer.from(bs58.decode(raw)).toString("base64");
 }
 
@@ -80,9 +90,10 @@ export async function POST(req: NextRequest) {
     }
 
     const data = await res.json();
+    console.log("Bags fee-share/config raw response:", JSON.stringify(data));
     if (!data.success) {
       return NextResponse.json(
-        { error: data.error ?? "Fee config failed" },
+        { error: data.response ?? data.error ?? "Fee config failed" },
         { status: 502 }
       );
     }
