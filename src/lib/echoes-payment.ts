@@ -34,7 +34,7 @@ const PLATFORM_WALLET = new PublicKey(
     "7PfDfuoNKzQCCxpRB5B6NFXq6RhuszYYBzbyrLLKkNhB"
 );
 
-const ECHOES_DECIMALS = 6; // adjust if different
+const ECHOES_DECIMALS = 9;
 const LISTING_FEE_USD = 1;
 
 /** Fetch the USD price of 1 ECHOES token via our server-side proxy */
