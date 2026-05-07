@@ -160,10 +160,10 @@ export default function PatioPage() {
                 </button>
                 <button
                   onClick={() => connectWallet()}
-                  className="ml-auto text-xs px-2.5 py-1 rounded-lg transition-colors"
-                  style={{ background: "rgba(0,0,0,0.05)", color: "var(--text-3)", border: "1px solid rgba(0,0,0,0.07)" }}
+                  className="ml-auto text-xs px-3 py-1.5 rounded-lg font-medium transition-opacity hover:opacity-80 active:scale-95"
+                  style={{ background: "var(--amber)", color: "#000" }}
                 >
-                  Change
+                  Change wallet
                 </button>
               </div>
               <div className="flex gap-4 mt-2">
