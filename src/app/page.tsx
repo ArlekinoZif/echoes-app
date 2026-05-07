@@ -120,7 +120,7 @@ function StoryCard({
             <ExternalLink className="w-3 h-3" /> Trade on Bags
           </a>
         )}
-        {story.status === "listed" && !story.tokenMint && story.authorWallet === wallet && (
+        {!story.tokenMint && story.authorWallet === wallet && (
           <Link
             href={`/tokenize/${story.id}`}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
@@ -289,7 +289,6 @@ export default function LibraryPage() {
                 story={story}
                 wallet={address}
                 canSponsor={
-                  story.status === "listed" &&
                   !story.tokenMint &&
                   story.authorWallet !== address
                 }
