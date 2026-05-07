@@ -15,7 +15,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           accentColor: "#00c6be",
           walletChainType: "solana-only",
         },
-        loginMethods: ["email", "wallet", "google", "twitter"],
+        loginMethodsAndOrder: {
+          primary: ["phantom", "backpack", "solflare", "detected_solana_wallets"],
+          overflow: ["email", "google", "twitter"],
+        },
         embeddedWallets: {
           solana: { createOnLogin: "users-without-wallets" },
         },
