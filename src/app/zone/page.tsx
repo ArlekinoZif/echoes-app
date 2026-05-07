@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Connection, PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { useWallet } from "@/hooks/useWallet";
 import { useConnectWallet } from "@privy-io/react-auth";
 import { fetchMyStories, fetchFavourites, fetchPublicStories } from "@/lib/db";
@@ -50,36 +51,29 @@ export default function PatioPage() {
     setFavStories(pub.filter((s) => favSet.has(s.id)));
   }
 
-  const ECHOES_MINT = "8F2N1Da9z1arxiFKmTzxaKoX1yUjJ2xKFQBxxMjQBAGS";
-  const TOKEN_PROGRAM = new PublicKey("TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA");
-  const TOKEN_2022_PROGRAM = new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb");
+  const ECHOES_MINT = new PublicKey("8F2N1Da9z1arxiFKmTzxaKoX1yUjJ2xKFQBxxMjQBAGS");
 
   async function fetchBalance(addr: string) {
     const conn = new Connection(RPC_URL, "confirmed");
     const pk = new PublicKey(addr);
-    const echoesMint = new PublicKey(ECHOES_MINT);
 
-    const [lamports, v1Accounts, v2Accounts] = await Promise.allSettled([
-      conn.getBalance(pk),
-      conn.getParsedTokenAccountsByOwner(pk, { programId: TOKEN_PROGRAM }),
-      conn.getParsedTokenAccountsByOwner(pk, { programId: TOKEN_2022_PROGRAM }),
-    ]);
+    // SOL balance
+    try {
+      const lamports = await conn.getBalance(pk);
+      setSolBalance(lamports / 1e9);
+    } catch { setSolBalance(null); }
 
-    if (lamports.status === "fulfilled") setSolBalance(lamports.value / 1e9);
-    else setSolBalance(null);
-
-    const allAccounts = [
-      ...(v1Accounts.status === "fulfilled" ? v1Accounts.value.value : []),
-      ...(v2Accounts.status === "fulfilled" ? v2Accounts.value.value : []),
-    ];
-
-    const echoesAccount = allAccounts.find(
-      (a) => a.account.data.parsed.info.mint === echoesMint.toBase58()
-    );
-    setEchoesBalance(echoesAccount
-      ? (echoesAccount.account.data.parsed.info.tokenAmount.uiAmount as number)
-      : 0
-    );
+    // ECHOES — try classic SPL token program first, then Token-2022
+    let echoesAmount: number | null = null;
+    for (const programId of [TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID]) {
+      try {
+        const ata = getAssociatedTokenAddressSync(ECHOES_MINT, pk, false, programId);
+        const bal = await conn.getTokenAccountBalance(ata);
+        echoesAmount = bal.value.uiAmount ?? 0;
+        break;
+      } catch { /* account doesn't exist under this program */ }
+    }
+    setEchoesBalance(echoesAmount ?? 0);
   }
 
   useEffect(() => {
