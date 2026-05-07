@@ -161,7 +161,7 @@ export default function PatioPage() {
                 <button
                   onClick={() => connectWallet()}
                   className="ml-auto text-xs px-3 py-1.5 rounded-lg font-medium transition-opacity hover:opacity-80 active:scale-95"
-                  style={{ background: "var(--amber)", color: "#000" }}
+                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
                 >
                   Change wallet
                 </button>
