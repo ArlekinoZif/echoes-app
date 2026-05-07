@@ -205,8 +205,8 @@ export default function RecordPage() {
 
             <button
               type="submit"
-              className="w-full py-3 rounded-xl font-semibold transition-colors"
-              style={{ background: "var(--amber)", color: "#000" }}
+              className="w-full py-3 rounded-xl font-semibold transition-opacity hover:opacity-90"
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               Continue
             </button>
@@ -227,8 +227,8 @@ export default function RecordPage() {
                 onClick={() => setGate("pay")}
                 className="p-5 rounded-2xl text-left transition-colors"
                 style={{
-                  border: gate === "pay" ? "2px solid var(--amber)" : "2px solid rgba(0,0,0,0.07)",
-                  background: gate === "pay" ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.6)",
+                  border: gate === "pay" ? "2px solid #00c6be" : "2px solid rgba(0,0,0,0.07)",
+                  background: gate === "pay" ? "rgba(0,198,190,0.06)" : "rgba(255,255,255,0.6)",
                 }}
               >
                 <div className="flex items-start gap-4">
@@ -253,8 +253,8 @@ export default function RecordPage() {
                 onClick={() => setGate("evaluate")}
                 className="p-5 rounded-2xl text-left transition-colors"
                 style={{
-                  border: gate === "evaluate" ? "2px solid var(--amber)" : "2px solid rgba(0,0,0,0.07)",
-                  background: gate === "evaluate" ? "rgba(245,158,11,0.06)" : "rgba(255,255,255,0.6)",
+                  border: gate === "evaluate" ? "2px solid #ff6b9d" : "2px solid rgba(0,0,0,0.07)",
+                  background: gate === "evaluate" ? "rgba(255,107,157,0.06)" : "rgba(255,255,255,0.6)",
                 }}
               >
                 <div className="flex items-start gap-4">
@@ -289,7 +289,7 @@ export default function RecordPage() {
               onClick={handleSubmit}
               disabled={submitting}
               className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
-              style={{ background: "var(--amber)", color: "#000" }}
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
             >
               {submitting ? (
                 <span className="flex items-center justify-center gap-2">
