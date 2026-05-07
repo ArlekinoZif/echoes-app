@@ -111,7 +111,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ meteoraConfigKey, transactions: txBase64s, needsCreation });
   } catch (err) {
-    console.error("bags/fee-config error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("bags/fee-config error:", msg);
+    return NextResponse.json({ error: `bags/fee-config: ${msg}` }, { status: 500 });
   }
 }

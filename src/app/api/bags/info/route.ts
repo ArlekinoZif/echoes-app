@@ -77,7 +77,8 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ tokenMint, tokenMetadata });
   } catch (err) {
-    console.error("bags/info error:", err);
-    return NextResponse.json({ error: "Internal error" }, { status: 500 });
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("bags/info error:", msg);
+    return NextResponse.json({ error: `bags/info: ${msg}` }, { status: 500 });
   }
 }
