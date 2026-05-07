@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
     if (!BAGS_API_KEY) {
       return NextResponse.json({
         tokenAddress: `mock_token_${Date.now()}`,
-        listingUrl: `https://bags.fm/token/mock_${Date.now()}?ref=${BAGS_REF}`,
+        listingUrl: `https://bags.fm/mock_${Date.now()}?ref=${BAGS_REF}`,
         transactionId: `mock_tx_${Date.now()}`,
       } satisfies BagsLaunchResult);
     }

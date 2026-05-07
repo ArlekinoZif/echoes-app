@@ -174,7 +174,7 @@ export default function TokenizePage({
       await signAndSendAllBase64Txs([launchTx]);
 
       // 7. Persist
-      const listingUrl = `https://bags.fm/token/${tokenMint}?ref=sirhitalk`;
+      const listingUrl = `https://bags.fm/${tokenMint}?ref=sirhitalk`;
       setBagsUrl(listingUrl);
       setTokenMint(tokenMint);
 

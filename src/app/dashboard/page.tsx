@@ -254,7 +254,7 @@ export default function DashboardPage() {
                             Author share: <span className="text-amber-400 font-semibold">0.75% of trading fees</span>
                           </div>
                           <a
-                            href={`https://bags.fm/token/${story.id}?ref=sirhitalk`}
+                            href={`https://bags.fm/${story.tokenMint}?ref=sirhitalk`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="flex items-center gap-1 text-xs text-neutral-400 hover:text-white transition-colors"
