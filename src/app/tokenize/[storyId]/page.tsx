@@ -87,6 +87,18 @@ export default function TokenizePage({
     []
   );
 
+  function advanceFromWallet() {
+    if (isSponsor) {
+      setStep("twitter", { status: "done", detail: "n/a" });
+      setCurrentStep("details");
+    } else if (twitterAccount) {
+      setStep("twitter", { status: "done", detail: "@" + (twitterAccount.username ?? twitterAccount.name) });
+      setCurrentStep("details");
+    } else {
+      setCurrentStep("twitter");
+    }
+  }
+
   useEffect(() => {
     fetchStory(storyId).then((s) => {
       if (!s) { router.push("/"); return; }
@@ -94,27 +106,17 @@ export default function TokenizePage({
       if (s.coverImageUrl) setCoverPreview(s.coverImageUrl);
       if (authenticated && address) {
         setStep("wallet", { status: "done", detail: address.slice(0, 6) + "…" + address.slice(-4) });
-        if (twitterAccount) {
-          setStep("twitter", { status: "done", detail: "@" + (twitterAccount.username ?? twitterAccount.name) });
-          setCurrentStep("details");
-        } else {
-          setCurrentStep("twitter");
-        }
+        advanceFromWallet();
       }
     });
-  }, [storyId, router, setStep, authenticated, address, twitterAccount]);
+  }, [storyId, router, setStep, authenticated, address, twitterAccount, isSponsor]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function handleConnectWallet() {
     setStep("wallet", { status: "loading" });
     try {
       const addr = await connect();
       setStep("wallet", { status: "done", detail: addr.slice(0, 6) + "…" + addr.slice(-4) });
-      if (twitterAccount) {
-        setStep("twitter", { status: "done", detail: "@" + (twitterAccount.username ?? twitterAccount.name) });
-        setCurrentStep("details");
-      } else {
-        setCurrentStep("twitter");
-      }
+      advanceFromWallet();
     } catch (e: unknown) {
       setStep("wallet", { status: "error", detail: toMsg(e) });
     }
