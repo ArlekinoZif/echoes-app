@@ -18,7 +18,7 @@ const BAGS_API_KEY = process.env.BAGS_API_KEY ?? "";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { name, symbol, description, imageBase64, imageUrl } = body;
+    const { name, symbol, description, imageBase64, imageUrl, twitter } = body;
 
     if (!name || !symbol || !description) {
       return NextResponse.json(
@@ -31,6 +31,7 @@ export async function POST(req: NextRequest) {
     formData.append("name", String(name).slice(0, 32));
     formData.append("symbol", String(symbol).toUpperCase().slice(0, 10));
     formData.append("description", String(description).slice(0, 1000));
+    if (twitter) formData.append("twitter", String(twitter));
 
     if (imageUrl) {
       formData.append("imageUrl", imageUrl);

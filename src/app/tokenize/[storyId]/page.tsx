@@ -7,12 +7,21 @@ import Image from "next/image";
 import { fetchStory, upsertStory } from "@/lib/db";
 import { Story } from "@/lib/types";
 import { useWallet } from "@/hooks/useWallet";
+import { usePrivy, useLinkAccount } from "@privy-io/react-auth";
 import {
   ArrowLeft, Wallet, Zap, CheckCircle, ExternalLink,
   Loader2, ImageIcon,
 } from "lucide-react";
 
-type Step = "wallet" | "details" | "launch" | "done";
+function XIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+    </svg>
+  );
+}
+
+type Step = "wallet" | "twitter" | "details" | "launch" | "done";
 type StepStatus = "idle" | "loading" | "done" | "error";
 
 interface StepState {
@@ -22,6 +31,7 @@ interface StepState {
 
 const STEP_META: { id: Step; label: string; icon: React.ReactNode }[] = [
   { id: "wallet", label: "Connect wallet", icon: <Wallet className="w-4 h-4" /> },
+  { id: "twitter", label: "Connect Twitter / X", icon: <XIcon className="w-4 h-4" /> },
   { id: "details", label: "Token details", icon: <ImageIcon className="w-4 h-4" /> },
   { id: "launch", label: "Launch on Bags App", icon: <Zap className="w-4 h-4" /> },
   { id: "done", label: "Done!", icon: <CheckCircle className="w-4 h-4" /> },
@@ -52,10 +62,17 @@ export default function TokenizePage({
   }, []);
 
   const { authenticated, address, connect, signAndSendAllBase64Txs } = useWallet();
+  const { user } = usePrivy();
+  const { linkTwitter } = useLinkAccount();
+
+  const twitterAccount = user?.linkedAccounts?.find((a) => a.type === "twitter_oauth") as
+    | { type: "twitter_oauth"; username?: string; name?: string }
+    | undefined;
 
   const [story, setStory] = useState<Story | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>("wallet");
   const [stepStates, setStepStates] = useState<Record<Step, StepState>>(initStates());
+  const [linkingTwitter, setLinkingTwitter] = useState(false);
 
   const [ticker, setTicker] = useState("");
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -77,20 +94,49 @@ export default function TokenizePage({
       if (s.coverImageUrl) setCoverPreview(s.coverImageUrl);
       if (authenticated && address) {
         setStep("wallet", { status: "done", detail: address.slice(0, 6) + "…" + address.slice(-4) });
-        setCurrentStep("details");
+        if (twitterAccount) {
+          setStep("twitter", { status: "done", detail: "@" + (twitterAccount.username ?? twitterAccount.name) });
+          setCurrentStep("details");
+        } else {
+          setCurrentStep("twitter");
+        }
       }
     });
-  }, [storyId, router, setStep, authenticated, address]);
+  }, [storyId, router, setStep, authenticated, address, twitterAccount]);
 
   async function handleConnectWallet() {
     setStep("wallet", { status: "loading" });
     try {
       const addr = await connect();
       setStep("wallet", { status: "done", detail: addr.slice(0, 6) + "…" + addr.slice(-4) });
-      setCurrentStep("details");
+      if (twitterAccount) {
+        setStep("twitter", { status: "done", detail: "@" + (twitterAccount.username ?? twitterAccount.name) });
+        setCurrentStep("details");
+      } else {
+        setCurrentStep("twitter");
+      }
     } catch (e: unknown) {
       setStep("wallet", { status: "error", detail: toMsg(e) });
     }
+  }
+
+  async function handleLinkTwitter() {
+    setLinkingTwitter(true);
+    try {
+      await linkTwitter();
+      // After linking, twitterAccount updates via Privy, but we can advance
+      setStep("twitter", { status: "done" });
+      setCurrentStep("details");
+    } catch (e: unknown) {
+      setStep("twitter", { status: "error", detail: toMsg(e) });
+    } finally {
+      setLinkingTwitter(false);
+    }
+  }
+
+  function handleSkipTwitter() {
+    setStep("twitter", { status: "done", detail: "skipped" });
+    setCurrentStep("details");
   }
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -127,6 +173,7 @@ export default function TokenizePage({
       }
 
       // 2. Create token info
+      const twitterHandle = twitterAccount?.username ?? twitterAccount?.name;
       const infoRes = await fetch("/api/bags/info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -136,6 +183,7 @@ export default function TokenizePage({
           description: story.description,
           imageUrl,
           imageBase64,
+          twitter: twitterHandle ? `@${twitterHandle}` : undefined,
         }),
       });
       if (!infoRes.ok) throw new Error((await infoRes.json()).error ?? "Token info failed");
@@ -319,6 +367,35 @@ export default function TokenizePage({
                   >
                     Connect wallet
                   </button>
+                )}
+
+                {isCurrent && s.id === "twitter" && (
+                  <div className="mt-4 flex flex-col gap-2">
+                    <p className="text-xs" style={{ color: "var(--text-3)" }}>
+                      Bags App uses your Twitter handle for the token page. Required to launch.
+                    </p>
+                    <button
+                      onClick={handleLinkTwitter}
+                      disabled={linkingTwitter}
+                      className="w-full py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-50"
+                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                    >
+                      {linkingTwitter ? (
+                        <span className="flex items-center justify-center gap-2">
+                          <Loader2 className="w-4 h-4 animate-spin" /> Connecting…
+                        </span>
+                      ) : (
+                        "Connect Twitter / X"
+                      )}
+                    </button>
+                    <button
+                      onClick={handleSkipTwitter}
+                      className="w-full py-2 rounded-xl text-sm font-medium transition-colors"
+                      style={{ color: "var(--text-3)", background: "transparent" }}
+                    >
+                      Skip for now
+                    </button>
+                  </div>
                 )}
 
                 {isCurrent && s.id === "details" && (
