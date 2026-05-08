@@ -20,7 +20,7 @@ export default function Providers({ children }: { children: React.ReactNode }) {
           overflow: ["email", "google", "twitter"],
         },
         embeddedWallets: {
-          solana: { createOnLogin: "users-without-wallets" },
+          solana: { createOnLogin: "off" },
         },
         externalWallets: {
           solana: { connectors: solanaConnectors },
