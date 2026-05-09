@@ -35,19 +35,10 @@ const PLATFORM_WALLET = new PublicKey(
 );
 
 const ECHOES_DECIMALS = 9;
-const LISTING_FEE_USD = 1;
-
-/** Fetch the USD price of 1 ECHOES token via our server-side proxy */
-async function getEchoesPriceUsd(): Promise<number> {
-  const res = await fetch("/api/echoes-price");
-  if (!res.ok) throw new Error("Failed to fetch ECHOES price");
-  const { price } = await res.json();
-  if (!price) throw new Error("ECHOES price not found");
-  return price;
-}
+const LISTING_FEE_ECHOES = 2400;
 
 /**
- * Build and send the $1 ECHOES listing payment.
+ * Build and send the 2400 $ECHOES listing payment.
  * Returns the transaction signature.
  */
 export async function payListingFee(
@@ -56,10 +47,8 @@ export async function payListingFee(
   signTransaction: (tx: Transaction) => Promise<Transaction>
 ): Promise<string> {
 
-  // 1. Get price → compute raw token amount
-  const priceUsd = await getEchoesPriceUsd();
-  const amountTokens = LISTING_FEE_USD / priceUsd;
-  const rawAmount = BigInt(Math.ceil(amountTokens * 10 ** ECHOES_DECIMALS));
+  // Fixed fee: 2400 $ECHOES
+  const rawAmount = BigInt(LISTING_FEE_ECHOES * 10 ** ECHOES_DECIMALS);
 
   const connection = new Connection(rpcUrl, "confirmed");
 

@@ -305,7 +305,7 @@ export default function RecordPage() {
                   <div>
                     <p className="font-semibold text-sm" style={{ color: "var(--text-1)" }}>Pay $1 to list</p>
                     <p className="text-sm mt-1" style={{ color: "var(--text-2)" }}>
-                      $1 in $ECHOES tokens — your story is listed immediately
+                      2400 $ECHOES — your story is listed immediately
                       and enters the weekly vote pool.
                     </p>
                   </div>
@@ -359,7 +359,7 @@ export default function RecordPage() {
                 <span className="flex items-center justify-center gap-2">
                   <Loader2 className="w-4 h-4 animate-spin" /> Uploading…
                 </span>
-              ) : gate === "pay" ? "Pay $1 in $ECHOES to list" : "Start evaluating"}
+              ) : gate === "pay" ? "Pay 2400 $ECHOES to list" : "Start evaluating"}
             </button>
           </div>
         )}

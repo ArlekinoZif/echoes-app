@@ -272,7 +272,7 @@ export default function ListPage({
                   <Loader2 className="w-4 h-4 animate-spin" /> Paying…
                 </span>
               ) : (
-                "Pay $1 $ECHOES — list my story"
+                "Pay 2400 $ECHOES — list my story"
               )}
             </button>
           </div>
