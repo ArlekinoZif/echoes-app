@@ -72,19 +72,20 @@ export default function PatioPage() {
   const { authenticated, address, connect } = useWallet();
   const { connectWallet } = useConnectWallet();
   const { user } = usePrivy();
-  const { linkTwitter, linkInstagram, linkTiktok } = useLinkAccount();
+  const { linkTwitter } = useLinkAccount();
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [echoesBalance, setEchoesBalance] = useState<number | null>(null);
   const [connecting, setConnecting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [linking, setLinking] = useState<string | null>(null);
+  const [instagramHandle, setInstagramHandle] = useState("");
+  const [tiktokHandle, setTiktokHandle] = useState("");
+  const [handlesSaved, setHandlesSaved] = useState(false);
 
   const accounts = user?.linkedAccounts ?? [];
   const emailAccount = accounts.find((a) => a.type === "email") as { type: "email"; address: string } | undefined;
   const googleAccount = accounts.find((a) => a.type === "google_oauth") as { type: "google_oauth"; email: string; name: string | null } | undefined;
   const twitterAccount = accounts.find((a) => a.type === "twitter_oauth") as { type: "twitter_oauth"; username: string | null; name: string | null } | undefined;
-  const instagramAccount = accounts.find((a) => a.type === "instagram_oauth") as { type: "instagram_oauth"; username: string | null } | undefined;
-  const tiktokAccount = accounts.find((a) => a.type === "tiktok_oauth") as { type: "tiktok_oauth"; username: string | null; name: string | null } | undefined;
 
   const [myStories, setMyStories] = useState<Story[]>([]);
   const [tokenized, setTokenized] = useState<Story[]>([]);
@@ -135,6 +136,8 @@ export default function PatioPage() {
     if (address) {
       loadData(address);
       fetchBalance(address);
+      setInstagramHandle(localStorage.getItem(`ig_${address}`) ?? "");
+      setTiktokHandle(localStorage.getItem(`tt_${address}`) ?? "");
     }
   }, [address]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -142,11 +145,17 @@ export default function PatioPage() {
     setLinking(provider);
     try {
       if (provider === "twitter") await linkTwitter();
-      else if (provider === "instagram") await linkInstagram();
-      else if (provider === "tiktok") await linkTiktok();
     } finally {
       setLinking(null);
     }
+  }
+
+  function saveHandles() {
+    if (!address) return;
+    localStorage.setItem(`ig_${address}`, instagramHandle.replace(/^@/, "").trim());
+    localStorage.setItem(`tt_${address}`, tiktokHandle.replace(/^@/, "").trim());
+    setHandlesSaved(true);
+    setTimeout(() => setHandlesSaved(false), 2000);
   }
 
   async function handleConnect() {
@@ -299,25 +308,54 @@ export default function PatioPage() {
               loading={linking === "twitter"}
             />
 
-            {/* Instagram */}
-            <AccountRow
-              icon={<InstagramIcon className="w-4 h-4" />}
-              iconBg="rgba(214,36,159,0.08)"
-              label={instagramAccount ? `@${instagramAccount.username}` : "Instagram"}
-              connected={!!instagramAccount}
-              onConnect={() => handleLink("instagram")}
-              loading={linking === "instagram"}
-            />
+            {/* Instagram — manual handle */}
+            <div
+              className="flex items-center gap-3 p-3 rounded-xl"
+              style={{ background: "rgba(255,255,255,0.5)", border: "1px solid rgba(0,0,0,0.06)" }}
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(214,36,159,0.08)" }}>
+                <InstagramIcon className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                value={instagramHandle}
+                onChange={(e) => setInstagramHandle(e.target.value)}
+                placeholder="Instagram @handle"
+                className="flex-1 text-sm bg-transparent outline-none min-w-0"
+                style={{ color: "var(--text-1)" }}
+              />
+            </div>
 
-            {/* TikTok */}
-            <AccountRow
-              icon={<TikTokIcon className="w-4 h-4" />}
-              iconBg="rgba(0,0,0,0.06)"
-              label={tiktokAccount ? `@${tiktokAccount.username ?? tiktokAccount.name}` : "TikTok"}
-              connected={!!tiktokAccount}
-              onConnect={() => handleLink("tiktok")}
-              loading={linking === "tiktok"}
-            />
+            {/* TikTok — manual handle */}
+            <div
+              className="flex items-center gap-3 p-3 rounded-xl"
+              style={{ background: "rgba(255,255,255,0.5)", border: "1px solid rgba(0,0,0,0.06)" }}
+            >
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: "rgba(0,0,0,0.06)" }}>
+                <TikTokIcon className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                value={tiktokHandle}
+                onChange={(e) => setTiktokHandle(e.target.value)}
+                placeholder="TikTok @handle"
+                className="flex-1 text-sm bg-transparent outline-none min-w-0"
+                style={{ color: "var(--text-1)" }}
+              />
+            </div>
+
+            {/* Save handles button */}
+            <button
+              onClick={saveHandles}
+              className="w-full py-2 rounded-xl text-sm font-semibold transition-colors"
+              style={
+                handlesSaved
+                  ? { background: "rgba(16,185,129,0.1)", color: "#10b981" }
+                  : { background: "rgba(0,0,0,0.05)", color: "var(--text-2)" }
+              }
+            >
+              {handlesSaved ? "✓ Saved" : "Save Instagram & TikTok"}
+            </button>
 
           </div>
         </div>
