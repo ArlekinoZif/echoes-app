@@ -12,7 +12,9 @@ export function useWallet() {
   const { wallets } = useSolanaWallets();
   const { createWallet } = useCreateWallet();
 
-  const solanaWallet = wallets[0] ?? null;
+  // Prefer external wallets (Phantom, Backpack, etc.) over the Privy embedded wallet
+  const solanaWallet =
+    wallets.find((w) => w.walletClientType !== "privy") ?? wallets[0] ?? null;
   const address = solanaWallet?.address ?? null;
 
   async function connect(): Promise<string> {
