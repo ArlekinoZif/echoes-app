@@ -24,7 +24,7 @@ export default function ListPage({
   const { storyId } = use(params);
   const router = useRouter();
 
-  const { authenticated, address, connect, signTransaction } = useWallet();
+  const { authenticated, address, connect, signAndSendAllBase64Txs } = useWallet();
 
   const [story, setStory] = useState<Story | null>(null);
   const [step, setStep] = useState<Step>("wallet");
@@ -64,7 +64,7 @@ export default function ListPage({
     setLoading(true);
     setError("");
     try {
-      const sig = await payListingFee(address, RPC_URL, signTransaction);
+      const sig = await payListingFee(address, RPC_URL, signAndSendAllBase64Txs);
       setShowTopUp(false);
       setTxSig(sig);
 
