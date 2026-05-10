@@ -1,6 +1,6 @@
 "use client";
 
-import { usePrivy } from "@privy-io/react-auth";
+import { usePrivy, useActiveWallet } from "@privy-io/react-auth";
 import { useWallets as useSolanaWallets, useCreateWallet } from "@privy-io/react-auth/solana";
 import { Transaction, Connection } from "@solana/web3.js";
 
@@ -9,12 +9,15 @@ const RPC_URL =
 
 export function useWallet() {
   const { ready, authenticated, login, logout } = usePrivy();
+  const { wallet: activeWallet, setActiveWallet } = useActiveWallet();
   const { wallets } = useSolanaWallets();
   const { createWallet } = useCreateWallet();
 
-  // Prefer external wallets (Phantom, Backpack, etc.) over the Privy embedded wallet
+  // Use the active wallet Privy has designated, matched against Solana wallets
   const solanaWallet =
-    wallets.find((w) => w.walletClientType !== "privy") ?? wallets[0] ?? null;
+    wallets.find((w) => w.address === (activeWallet as { address?: string } | undefined)?.address)
+    ?? wallets[0]
+    ?? null;
   const address = solanaWallet?.address ?? null;
 
   async function connect(): Promise<string> {
@@ -66,5 +69,6 @@ export function useWallet() {
     signTransaction,
     signAllTransactions,
     signAndSendAllBase64Txs,
+    setActiveWallet,
   };
 }

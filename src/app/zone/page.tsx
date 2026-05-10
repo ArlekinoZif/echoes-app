@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Connection, PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync, TOKEN_PROGRAM_ID, TOKEN_2022_PROGRAM_ID } from "@solana/spl-token";
 import { useWallet } from "@/hooks/useWallet";
-import { useConnectWallet, usePrivy, useLinkAccount } from "@privy-io/react-auth";
+import { usePrivy, useLinkAccount, useActiveWallet } from "@privy-io/react-auth";
 import { fetchMyStories, fetchFavourites, fetchPublicStories } from "@/lib/db";
 import { Story } from "@/lib/types";
 import {
@@ -69,8 +69,8 @@ function shortAddr(addr: string) {
 }
 
 export default function PatioPage() {
-  const { authenticated, address, connect } = useWallet();
-  const { connectWallet } = useConnectWallet();
+  const { authenticated, address, connect, setActiveWallet } = useWallet();
+  const { connect: connectActiveWallet } = useActiveWallet();
   const { user } = usePrivy();
   const { linkTwitter } = useLinkAccount();
   const [solBalance, setSolBalance] = useState<number | null>(null);
@@ -259,7 +259,10 @@ export default function PatioPage() {
               </div>
               {address ? (
                 <button
-                  onClick={() => connectWallet()}
+                  onClick={async () => {
+                    const { wallet } = await connectActiveWallet({ reset: true });
+                    if (wallet) setActiveWallet(wallet);
+                  }}
                   className="text-xs px-2.5 py-1.5 rounded-lg font-medium flex-shrink-0 transition-opacity hover:opacity-80"
                   style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-2)" }}
                 >
