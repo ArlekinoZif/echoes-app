@@ -19,11 +19,19 @@ export async function uploadImageToR2(file: File): Promise<UploadResult> {
 
   const { presignedUrl, key } = await res.json();
 
-  const uploadRes = await fetch(presignedUrl, {
-    method: "PUT",
-    headers: { "Content-Type": file.type || "image/jpeg" },
-    body: file,
-  });
+  const imageController = new AbortController();
+  const imageTimeout = setTimeout(() => imageController.abort(), 30_000);
+  let uploadRes: Response;
+  try {
+    uploadRes = await fetch(presignedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": file.type || "image/jpeg" },
+      body: file,
+      signal: imageController.signal,
+    });
+  } finally {
+    clearTimeout(imageTimeout);
+  }
 
   if (!uploadRes.ok) throw new Error("Image upload to R2 failed");
 
@@ -48,11 +56,19 @@ export async function uploadAudioToR2(blob: Blob): Promise<UploadResult> {
   const { presignedUrl, key } = await res.json();
 
   // Upload directly to R2
-  const uploadRes = await fetch(presignedUrl, {
-    method: "PUT",
-    headers: { "Content-Type": blob.type || "audio/webm" },
-    body: blob,
-  });
+  const audioController = new AbortController();
+  const audioTimeout = setTimeout(() => audioController.abort(), 30_000);
+  let uploadRes: Response;
+  try {
+    uploadRes = await fetch(presignedUrl, {
+      method: "PUT",
+      headers: { "Content-Type": blob.type || "audio/webm" },
+      body: blob,
+      signal: audioController.signal,
+    });
+  } finally {
+    clearTimeout(audioTimeout);
+  }
 
   if (!uploadRes.ok) throw new Error("Upload to R2 failed");
 

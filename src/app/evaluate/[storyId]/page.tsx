@@ -64,6 +64,7 @@ export default function EvaluateStoryPage({
     descriptionAccuracy: 0,
   });
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -98,14 +99,20 @@ export default function EvaluateStoryPage({
     criteria.descriptionAccuracy > 0;
 
   const handleSubmit = async () => {
-    if (!canSubmit || !story) return;
-    const wallet = address ?? "anonymous";
-    await upsertEvaluation(
-      { storyId: story.id, criteria, listenedPercent: Math.round(listenedMax * 100) },
-      wallet
-    );
-    setSubmitted(true);
-    setTimeout(() => router.push("/evaluate"), 1500);
+    if (!canSubmit || !story || submitting) return;
+    setSubmitting(true);
+    try {
+      await upsertEvaluation(
+        { storyId: story.id, criteria, listenedPercent: Math.round(listenedMax * 100) },
+        address ?? "anonymous",
+      );
+      setSubmitted(true);
+      setTimeout(() => router.push("/evaluate"), 1500);
+    } catch (err) {
+      console.error("Evaluation submit failed:", err);
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   if (!story) return null;
@@ -222,11 +229,11 @@ export default function EvaluateStoryPage({
 
           <button
             onClick={handleSubmit}
-            disabled={!canSubmit || submitted}
+            disabled={!canSubmit || submitted || submitting}
             className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
           >
-            {submitted ? "Saved!" : "Submit evaluation"}
+            {submitted ? "Saved!" : submitting ? "Saving…" : "Submit evaluation"}
           </button>
         </div>
       </div>

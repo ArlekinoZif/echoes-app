@@ -69,54 +69,44 @@ export default function RecordPage() {
     setSubmitting(true);
     setUploadError("");
 
-    let audioUrl: string;
     try {
-      const result = await uploadAudioToR2(audioBlob);
-      audioUrl = result.url;
-    } catch (err) {
-      console.error("R2 upload failed:", err);
-      setUploadError("Upload failed — please check your connection and try again.");
-      setSubmitting(false);
-      return;
-    }
+      const { url: audioUrl } = await uploadAudioToR2(audioBlob);
 
-    let coverImageUrl: string | undefined;
-    if (coverImage) {
-      try {
-        const result = await uploadImageToR2(coverImage);
-        coverImageUrl = result.url;
-      } catch (err) {
-        console.error("Cover image upload failed:", err);
+      let coverImageUrl: string | undefined;
+      if (coverImage) {
+        try {
+          const result = await uploadImageToR2(coverImage);
+          coverImageUrl = result.url;
+        } catch {
+          // cover image is optional — skip silently
+        }
       }
-    }
 
-    const story: Story = {
-      id: crypto.randomUUID(),
-      title: title.trim(),
-      description: description.trim(),
-      category,
-      audioBlobUrl: audioUrl,
-      durationSeconds: audioDuration,
-      publishGate: gate,
-      createdAt: Date.now(),
-      status: gate === "pay" ? "draft" : "pending_eval",
-      authorWallet: address ?? undefined,
-      coverImageUrl,
-      authorTwitter: twitterAccount
-        ? (twitterAccount.username ?? twitterAccount.name ?? undefined)
-        : undefined,
-    };
+      const story: Story = {
+        id: crypto.randomUUID(),
+        title: title.trim(),
+        description: description.trim(),
+        category,
+        audioBlobUrl: audioUrl,
+        durationSeconds: audioDuration,
+        publishGate: gate,
+        createdAt: Date.now(),
+        status: gate === "pay" ? "draft" : "pending_eval",
+        authorWallet: address ?? undefined,
+        coverImageUrl,
+        authorTwitter: twitterAccount
+          ? (twitterAccount.username ?? twitterAccount.name ?? undefined)
+          : undefined,
+      };
 
-    try {
       await upsertStory(story);
-    } catch (err) {
-      console.error("Failed to save story:", err);
-    }
 
-    if (gate === "evaluate") {
-      router.push("/evaluate");
-    } else {
-      router.push(`/list/${story.id}`);
+      router.push(gate === "evaluate" ? "/evaluate" : `/list/${story.id}`);
+    } catch (err) {
+      console.error("Submit failed:", err);
+      setUploadError("Upload failed — please check your connection and try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
