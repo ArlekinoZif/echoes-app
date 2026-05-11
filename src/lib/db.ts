@@ -82,17 +82,12 @@ export async function fetchPublicStories(): Promise<Story[]> {
   return (data ?? []).map(rowToStory);
 }
 
-export async function fetchStoriesForEvaluation(
-  excludeWallet?: string | null
-): Promise<Story[]> {
-  let query = supabase
+export async function fetchStoriesForEvaluation(): Promise<Story[]> {
+  const { data, error } = await supabase
     .from("stories")
     .select("*")
-    .in("status", ["pending_eval", "listed", "tokenized"]);
-  if (excludeWallet) {
-    query = query.neq("author_wallet", excludeWallet);
-  }
-  const { data, error } = await query;
+    .in("status", ["pending_eval", "listed", "tokenized"])
+    .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map(rowToStory);
 }

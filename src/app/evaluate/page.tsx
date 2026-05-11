@@ -29,7 +29,7 @@ export default function EvaluatePage() {
 
   async function refresh(wallet: string | null) {
     const [available, sponsorList, evalledIds, myStories] = await Promise.all([
-      fetchStoriesForEvaluation(wallet),
+      fetchStoriesForEvaluation(),
       fetchStoriesForSponsor(wallet),
       wallet ? fetchMyEvaluatedIds(wallet) : Promise.resolve([] as string[]),
       wallet ? fetchMyStories(wallet) : Promise.resolve([] as Story[]),
