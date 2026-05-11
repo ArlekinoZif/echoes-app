@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   fetchStoriesForEvaluation,
@@ -20,6 +21,7 @@ function fmt(s: number) {
 }
 
 export default function EvaluatePage() {
+  const router = useRouter();
   const { address } = useWallet();
   const [evalStories, setEvalStories] = useState<Story[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
@@ -55,9 +57,12 @@ export default function EvaluatePage() {
     if (!unlocked || !address) return;
     fetchMyStories(address).then(async (mine) => {
       const pending = mine.filter((s) => s.status === "pending_eval");
-      if (pending.length === 0) return;
+      if (pending.length === 0) {
+        router.push("/");
+        return;
+      }
       await Promise.all(pending.map((s) => upsertStory({ ...s, status: "listed" })));
-      refresh(address);
+      router.push("/");
     });
   }, [unlocked, address]); // eslint-disable-line react-hooks/exhaustive-deps
 

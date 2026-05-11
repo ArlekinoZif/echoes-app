@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useRef, useCallback } from "react";
-import { Mic, Square, Play, Pause, Trash2 } from "lucide-react";
+import { Mic, Square, Play, Pause, Trash2, Loader2 } from "lucide-react";
 import clsx from "clsx";
 
 interface Props {
-  onRecordingComplete: (blob: Blob, durationSeconds: number) => void;
+  onRecordingComplete: (blob: Blob, durationSeconds: number, transcript?: string) => void;
 }
 
 type RecorderState = "idle" | "recording" | "recorded";
@@ -15,6 +15,8 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
   const [duration, setDuration] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playProgress, setPlayProgress] = useState(0);
+  const [transcribing, setTranscribing] = useState(false);
+  const [transcript, setTranscript] = useState<string | undefined>(undefined);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -22,6 +24,24 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTimeRef = useRef<number>(0);
+  const durationRef = useRef<number>(0);
+
+  const startTranscription = useCallback(async (blob: Blob) => {
+    setTranscribing(true);
+    try {
+      const form = new FormData();
+      form.append("audio", blob, "recording.webm");
+      const res = await fetch("/api/transcribe", { method: "POST", body: form });
+      if (res.ok) {
+        const { transcript: text } = await res.json();
+        setTranscript(text ?? undefined);
+      }
+    } catch {
+      // Non-fatal — transcript just won't be pre-filled
+    } finally {
+      setTranscribing(false);
+    }
+  }, []);
 
   const startRecording = useCallback(async () => {
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -40,13 +60,14 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
       audioRef.current = new Audio(url);
       audioRef.current.ontimeupdate = () => {
         if (!audioRef.current) return;
-        const pct =
-          (audioRef.current.currentTime / audioRef.current.duration) * 100;
+        const pct = (audioRef.current.currentTime / audioRef.current.duration) * 100;
         setPlayProgress(pct);
       };
       audioRef.current.onended = () => setIsPlaying(false);
       stream.getTracks().forEach((t) => t.stop());
       setState("recorded");
+      // Kick off transcription in background
+      startTranscription(blob);
     };
 
     recorder.start();
@@ -54,14 +75,17 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
     setState("recording");
 
     timerRef.current = setInterval(() => {
-      setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
+      const secs = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      setDuration(secs);
+      durationRef.current = secs;
     }, 1000);
-  }, []);
+  }, [startTranscription]);
 
   const stopRecording = useCallback(() => {
     mediaRecorderRef.current?.stop();
     if (timerRef.current) clearInterval(timerRef.current);
-    setDuration(Math.floor((Date.now() - startTimeRef.current) / 1000));
+    durationRef.current = Math.floor((Date.now() - startTimeRef.current) / 1000);
+    setDuration(durationRef.current);
   }, []);
 
   const togglePlay = useCallback(() => {
@@ -83,11 +107,15 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
     setDuration(0);
     setPlayProgress(0);
     setIsPlaying(false);
+    setTranscript(undefined);
+    setTranscribing(false);
   }, []);
 
   const confirm = useCallback(() => {
-    if (blobRef.current) onRecordingComplete(blobRef.current, duration);
-  }, [duration, onRecordingComplete]);
+    if (blobRef.current) {
+      onRecordingComplete(blobRef.current, durationRef.current, transcript);
+    }
+  }, [transcript, onRecordingComplete]);
 
   const fmt = (s: number) =>
     `${String(Math.floor(s / 60)).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
@@ -95,7 +123,13 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
   return (
     <div
       className="flex flex-col items-center gap-6 p-8 rounded-2xl"
-      style={{ background: "rgba(255,255,255,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)", border: "1px solid rgba(255,255,255,0.8)", boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}
+      style={{
+        background: "rgba(255,255,255,0.6)",
+        backdropFilter: "blur(16px)",
+        WebkitBackdropFilter: "blur(16px)",
+        border: "1px solid rgba(255,255,255,0.8)",
+        boxShadow: "0 2px 16px rgba(0,0,0,0.06)",
+      }}
     >
       {/* Waveform / status visual */}
       <div className="flex items-center gap-1 h-12">
@@ -134,6 +168,22 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
         {fmt(duration)}
       </span>
 
+      {/* Transcription status */}
+      {state === "recorded" && (
+        <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-3)" }}>
+          {transcribing ? (
+            <>
+              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              Transcribing…
+            </>
+          ) : transcript ? (
+            <span style={{ color: "#10b981" }}>✓ Transcript ready — will pre-fill description</span>
+          ) : (
+            <span>No transcript (description field will be blank)</span>
+          )}
+        </div>
+      )}
+
       {/* Controls */}
       <div className="flex items-center gap-4">
         {state === "idle" && (
@@ -151,7 +201,11 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
           <button
             onClick={stopRecording}
             className="flex items-center gap-2 px-6 py-3 rounded-full font-semibold transition-colors"
-            style={{ background: "rgba(0,0,0,0.08)", color: "var(--text-1)", border: "1px solid rgba(0,0,0,0.1)" }}
+            style={{
+              background: "rgba(0,0,0,0.08)",
+              color: "var(--text-1)",
+              border: "1px solid rgba(0,0,0,0.1)",
+            }}
           >
             <Square className="w-4 h-4" style={{ fill: "var(--text-1)" }} />
             Stop
@@ -173,16 +227,15 @@ export default function AudioRecorder({ onRecordingComplete }: Props) {
               className="p-3 rounded-full transition-colors"
               style={{ background: "rgba(0,0,0,0.08)", color: "var(--text-1)" }}
             >
-              {isPlaying ? (
-                <Pause className="w-5 h-5" />
-              ) : (
-                <Play className="w-5 h-5" />
-              )}
+              {isPlaying ? <Pause className="w-5 h-5" /> : <Play className="w-5 h-5" />}
             </button>
             <button
               onClick={confirm}
               className="px-6 py-3 rounded-full font-semibold transition-colors"
-              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+              style={{
+                background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)",
+                color: "#fff",
+              }}
             >
               Use this recording
             </button>
