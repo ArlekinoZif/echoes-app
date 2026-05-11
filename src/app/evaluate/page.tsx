@@ -129,27 +129,44 @@ export default function EvaluatePage() {
             </Link>
           </div>
         ) : evalStories.length === 0 ? (
-          <div className="text-center py-12 flex flex-col items-center gap-4 mb-8">
-            <div
-              className="w-16 h-16 rounded-full flex items-center justify-center"
-              style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.06)" }}
-            >
-              <Mic className="w-6 h-6" style={{ color: "var(--text-3)" }} />
-            </div>
-            <p className="text-sm" style={{ color: "var(--text-2)" }}>
-              No stories available for evaluation yet.
-            </p>
-            <p className="text-xs" style={{ color: "var(--text-3)" }}>
-              Check back soon — more stories are being submitted.
-            </p>
-            {myPendingCount > 0 && firstPendingId && (
-              <Link
-                href={`/list/${firstPendingId}`}
-                className="mt-2 px-4 py-2 rounded-xl text-sm font-medium transition-colors"
-                style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-1)", border: "1px solid rgba(0,0,0,0.07)" }}
-              >
-                Pay $1 to list now →
-              </Link>
+          <div className="flex flex-col gap-4 mb-8">
+            {/* If user has a pending story — show pay-to-list as the primary action */}
+            {myPendingCount > 0 && firstPendingId ? (
+              <>
+                <div
+                  className="p-5 rounded-2xl"
+                  style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.3)" }}
+                >
+                  <p className="font-semibold text-sm mb-1" style={{ color: "var(--text-1)" }}>
+                    No stories to review right now
+                  </p>
+                  <p className="text-sm" style={{ color: "var(--text-2)" }}>
+                    The evaluation queue is empty — no other stories are waiting for review yet.
+                    You can skip the queue and list your story immediately for 2400 $ECHOES.
+                  </p>
+                </div>
+                <Link
+                  href={`/list/${firstPendingId}`}
+                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm transition-opacity hover:opacity-80"
+                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                >
+                  Pay 2400 $ECHOES — list my story now
+                </Link>
+                <p className="text-xs text-center" style={{ color: "var(--text-3)" }}>
+                  Or check back later when more stories are submitted for evaluation.
+                </p>
+              </>
+            ) : (
+              <div className="text-center py-12 flex flex-col items-center gap-3">
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.06)" }}
+                >
+                  <Mic className="w-6 h-6" style={{ color: "var(--text-3)" }} />
+                </div>
+                <p className="text-sm" style={{ color: "var(--text-2)" }}>No stories available for evaluation yet.</p>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>Check back soon — more stories are being submitted.</p>
+              </div>
             )}
           </div>
         ) : (
