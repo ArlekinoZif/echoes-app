@@ -12,15 +12,19 @@ const LISTEN_THRESHOLD = 0.8;
 
 interface StarRatingProps {
   label: string;
+  hint: string;
   value: number;
   onChange: (v: number) => void;
   disabled?: boolean;
 }
 
-function StarRating({ label, value, onChange, disabled }: StarRatingProps) {
+function StarRating({ label, hint, value, onChange, disabled }: StarRatingProps) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-sm" style={{ color: "var(--text-2)" }}>{label}</span>
+      <div>
+        <span className="text-sm font-medium" style={{ color: "var(--text-1)" }}>{label}</span>
+        <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>{hint}</p>
+      </div>
       <div className="flex gap-2">
         {[1, 2, 3, 4, 5].map((star) => (
           <button
@@ -196,18 +200,21 @@ export default function EvaluateStoryPage({
 
           <StarRating
             label="Audio quality"
+            hint="Is the voice clear and loud enough? No lag, distortion, or background noise?"
             value={criteria.audioQuality}
             onChange={(v) => setCriteria((c) => ({ ...c, audioQuality: v }))}
             disabled={!ratingUnlocked}
           />
           <StarRating
             label="Storytelling"
+            hint="Is it logically structured and interesting to listen to?"
             value={criteria.storytelling}
             onChange={(v) => setCriteria((c) => ({ ...c, storytelling: v }))}
             disabled={!ratingUnlocked}
           />
           <StarRating
             label="Description accuracy"
+            hint="Does the title and description honestly reflect what the story is about?"
             value={criteria.descriptionAccuracy}
             onChange={(v) => setCriteria((c) => ({ ...c, descriptionAccuracy: v }))}
             disabled={!ratingUnlocked}
