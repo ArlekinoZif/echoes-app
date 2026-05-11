@@ -12,6 +12,7 @@ import {
   Wallet, Mic, Heart, Coins, TrendingUp, ExternalLink,
   CheckCircle, Clock, Zap, Copy, Loader2, User, Mail,
 } from "lucide-react";
+import AudioPlayer from "@/components/AudioPlayer";
 
 function XIcon({ className }: { className?: string }) {
   return (
@@ -384,53 +385,60 @@ export default function PatioPage() {
               {myStories.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-start justify-between gap-3 p-3 rounded-xl"
+                  className="flex flex-col gap-2 p-3 rounded-xl"
                   style={{ background: "rgba(255,255,255,0.5)", border: "1px solid rgba(0,0,0,0.07)" }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{s.title}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-xs" style={{ color: "var(--text-3)" }}>{fmt(s.durationSeconds)}</span>
-                      {statusBadge(s)}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{s.title}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs" style={{ color: "var(--text-3)" }}>{fmt(s.durationSeconds)}</span>
+                        {statusBadge(s)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      {s.status === "draft" && (
+                        <Link
+                          href={`/list/${s.id}`}
+                          className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors"
+                          style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-2)" }}
+                        >
+                          Pay to list →
+                        </Link>
+                      )}
+                      {s.status === "pending_eval" && (
+                        <Link
+                          href="/evaluate"
+                          className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors"
+                          style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-2)" }}
+                        >
+                          Evaluate →
+                        </Link>
+                      )}
+                      {s.status === "listed" && !s.tokenMint && (
+                        <Link
+                          href={`/tokenize/${s.id}`}
+                          className="text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors"
+                          style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                        >
+                          Tokenize
+                        </Link>
+                      )}
+                      {s.tokenListingUrl && (
+                        <a
+                          href={s.tokenListingUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="transition-colors"
+                          style={{ color: "var(--text-3)" }}
+                        >
+                          <ExternalLink className="w-4 h-4" />
+                        </a>
+                      )}
                     </div>
                   </div>
-                  {s.status === "draft" && (
-                    <Link
-                      href={`/list/${s.id}`}
-                      className="flex-shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors"
-                      style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-2)" }}
-                    >
-                      Pay to list →
-                    </Link>
-                  )}
-                  {s.status === "pending_eval" && (
-                    <Link
-                      href="/evaluate"
-                      className="flex-shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors"
-                      style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-2)" }}
-                    >
-                      Evaluate →
-                    </Link>
-                  )}
-                  {s.status === "listed" && !s.tokenMint && (
-                    <Link
-                      href={`/tokenize/${s.id}`}
-                      className="flex-shrink-0 text-xs px-2.5 py-1 rounded-lg font-semibold transition-colors"
-                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
-                    >
-                      Tokenize
-                    </Link>
-                  )}
-                  {s.tokenListingUrl && (
-                    <a
-                      href={s.tokenListingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-shrink-0 transition-colors"
-                      style={{ color: "var(--text-3)" }}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+                  {s.audioBlobUrl && (
+                    <AudioPlayer src={s.audioBlobUrl} durationSeconds={s.durationSeconds} />
                   )}
                 </li>
               ))}
@@ -539,28 +547,33 @@ export default function PatioPage() {
               {favStories.map((s) => (
                 <li
                   key={s.id}
-                  className="flex items-center justify-between gap-3 p-3 rounded-xl"
+                  className="flex flex-col gap-2 p-3 rounded-xl"
                   style={{ background: "rgba(255,255,255,0.5)", border: "1px solid rgba(0,0,0,0.07)" }}
                 >
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{s.title}</p>
-                    <span
-                      className="text-xs px-1.5 py-0.5 rounded-full"
-                      style={{ color: "var(--amber)", background: "rgba(245,158,11,0.1)" }}
-                    >
-                      {s.category}
-                    </span>
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium truncate" style={{ color: "var(--text-1)" }}>{s.title}</p>
+                      <span
+                        className="text-xs px-1.5 py-0.5 rounded-full"
+                        style={{ color: "var(--amber)", background: "rgba(245,158,11,0.1)" }}
+                      >
+                        {s.category}
+                      </span>
+                    </div>
+                    {s.tokenListingUrl && (
+                      <a
+                        href={s.tokenListingUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-shrink-0 transition-colors"
+                        style={{ color: "var(--text-3)" }}
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                      </a>
+                    )}
                   </div>
-                  {s.tokenListingUrl && (
-                    <a
-                      href={s.tokenListingUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-shrink-0 transition-colors"
-                      style={{ color: "var(--text-3)" }}
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                    </a>
+                  {s.audioBlobUrl && (
+                    <AudioPlayer src={s.audioBlobUrl} durationSeconds={s.durationSeconds} />
                   )}
                 </li>
               ))}

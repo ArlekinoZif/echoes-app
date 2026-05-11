@@ -6,6 +6,7 @@ import { fetchPublicStories, fetchStoriesForSponsor, fetchFavourites, toggleFavo
 import { useWallet } from "@/hooks/useWallet";
 import { Story, StoryCategory } from "@/lib/types";
 import { Heart, ExternalLink, Zap, Mic, Search, SlidersHorizontal, X } from "lucide-react";
+import AudioPlayer from "@/components/AudioPlayer";
 
 function XIcon({ className }: { className?: string }) {
   return (
@@ -107,6 +108,10 @@ function StoryCard({
           <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
         </button>
       </div>
+
+      {story.audioBlobUrl && (
+        <AudioPlayer src={story.audioBlobUrl} durationSeconds={story.durationSeconds} />
+      )}
 
       <div className="flex items-center gap-2">
         {story.tokenListingUrl && (
