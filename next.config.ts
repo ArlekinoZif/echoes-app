@@ -3,8 +3,18 @@ import path from "path";
 
 const noopModule = path.resolve(__dirname, "src/lib/__noop__.ts");
 
+const R2_HOST = process.env.NEXT_PUBLIC_R2_PUBLIC_URL
+  ? new URL(process.env.NEXT_PUBLIC_R2_PUBLIC_URL).hostname
+  : "pub-a37a5c77e46d4e9e98a12b28a9c128e1.r2.dev";
+
 const nextConfig: NextConfig = {
   outputFileTracingRoot: path.resolve(__dirname),
+
+  images: {
+    remotePatterns: [
+      { protocol: "https", hostname: R2_HOST },
+    ],
+  },
 
   // @solana/web3.js and Anchor are used in API routes — let Node require them
   // natively instead of bundling them, which avoids re-compilation on every
