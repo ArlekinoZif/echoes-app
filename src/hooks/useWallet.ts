@@ -13,11 +13,13 @@ export function useWallet() {
   const { wallets } = useSolanaWallets();
   const { createWallet } = useCreateWallet();
 
-  // Use the active wallet Privy has designated, matched against Solana wallets
-  const solanaWallet =
-    wallets.find((w) => w.address === (activeWallet as { address?: string } | undefined)?.address)
-    ?? wallets[0]
-    ?? null;
+  // Use the active wallet Privy has designated, matched against Solana wallets.
+  // Only fall back to wallets[0] when no active wallet is set at all — never
+  // auto-switch to a different wallet if the user already has one selected.
+  const activeAddress = (activeWallet as { address?: string } | undefined)?.address;
+  const solanaWallet = activeAddress
+    ? (wallets.find((w) => w.address === activeAddress) ?? null)
+    : (wallets[0] ?? null);
   const address = solanaWallet?.address ?? null;
 
   async function connect(): Promise<string> {
