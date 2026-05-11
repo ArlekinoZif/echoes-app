@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchPublicStories, fetchStoriesForSponsor, fetchFavourites, toggleFavouriteDb } from "@/lib/db";
 import { useWallet } from "@/hooks/useWallet";
 import { Story, StoryCategory } from "@/lib/types";
-import { Heart, ExternalLink, Zap, Mic, Search, SlidersHorizontal, X } from "lucide-react";
+import { Heart, ExternalLink, Zap, Mic, Play, Search, SlidersHorizontal, X } from "lucide-react";
 import Image from "next/image";
 import AudioPlayer from "@/components/AudioPlayer";
 
@@ -41,9 +41,10 @@ function StoryCard({
   onFavToggle: (id: string, wallet: string | null) => void;
 }) {
   const [fav, setFav] = useState(isFav);
+  const [playerOpen, setPlayerOpen] = useState(false);
 
   async function handleFav(e: React.MouseEvent) {
-    e.preventDefault();
+    e.stopPropagation();
     if (!wallet) return;
     const next = await toggleFavouriteDb(story.id, wallet);
     setFav(next);
@@ -51,14 +52,11 @@ function StoryCard({
   }
 
   function handleShare(e: React.MouseEvent) {
-    e.preventDefault();
-    const desc = story.description.length > 80
-      ? story.description.slice(0, 77) + "…"
-      : story.description;
+    e.stopPropagation();
     const link = story.tokenListingUrl ?? "https://echoes.fans";
     const authorTag = story.authorTwitter ? `@${story.authorTwitter}` : null;
     const byLine = authorTag ? ` by ${authorTag}` : "";
-    const text = `🎙️ "${story.title}"${byLine} — a ${story.category} story on Echoes\n\n${desc}\n\nListen & trade: ${link}`;
+    const text = `🎙️ "${story.title}"${byLine} — a ${story.category} story on Echoes\n\nListen & trade: ${link}`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
       "_blank",
@@ -66,133 +64,113 @@ function StoryCard({
     );
   }
 
-  return (
-    <div
-      className="glass p-4 flex flex-col gap-3 transition-colors"
-      style={{ borderRadius: "16px" }}
-    >
-      <div className="flex items-start gap-3">
-        {/* Cover image thumbnail */}
-        {story.coverImageUrl && (
-          <Image
-            src={story.coverImageUrl}
-            alt="cover"
-            width={52}
-            height={52}
-            className="rounded-xl object-cover flex-shrink-0"
-            style={{ width: 52, height: 52 }}
-          />
-        )}
+  const authorLabel = story.authorTwitter
+    ? `@${story.authorTwitter}`
+    : story.authorWallet
+    ? `${story.authorWallet.slice(0, 4)}…${story.authorWallet.slice(-4)}`
+    : null;
 
-        <div className="flex-1 min-w-0">
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span
-                className="text-xs font-medium px-2 py-0.5 rounded-full"
-                style={{ color: "var(--text-2)", background: "rgba(0,0,0,0.06)" }}
-              >
-                {story.category}
-              </span>
-              <span className="text-xs" style={{ color: "var(--text-3)" }}>
-                {fmt(story.durationSeconds)}
-              </span>
-              {story.status === "tokenized" && (
-                <span
-                  className="text-xs font-medium px-2 py-0.5 rounded-full"
-                  style={{
-                    background: "linear-gradient(135deg, rgba(168,237,234,0.15), rgba(195,177,225,0.15))",
-                    color: "#a8edea",
-                    border: "1px solid rgba(168,237,234,0.2)",
-                  }}
-                >
-                  ◆ tokenized
-                </span>
-              )}
-            </div>
-            <button
-              onClick={handleFav}
-              className="p-1.5 rounded-full transition-colors flex-shrink-0"
-              style={{ color: fav ? "#fed6e3" : "var(--text-3)" }}
+  const meta = [story.category, authorLabel, fmt(story.durationSeconds)]
+    .filter(Boolean)
+    .join(" · ");
+
+  return (
+    <div className="glass overflow-hidden" style={{ borderRadius: "16px" }}>
+      {/* Main row */}
+      <div
+        className="flex items-center gap-3 px-3 py-3 cursor-pointer active:opacity-80 transition-opacity"
+        onClick={() => story.audioBlobUrl && setPlayerOpen((o) => !o)}
+      >
+        {/* Thumbnail / play indicator */}
+        <div
+          className="relative flex-shrink-0 rounded-xl overflow-hidden"
+          style={{ width: 44, height: 44 }}
+        >
+          {story.coverImageUrl ? (
+            <Image src={story.coverImageUrl} alt="cover" fill className="object-cover" />
+          ) : (
+            <div
+              className="w-full h-full flex items-center justify-center"
+              style={{ background: "linear-gradient(135deg, rgba(0,198,190,0.2), rgba(199,125,255,0.2))" }}
             >
-              <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
-            </button>
+              <Mic className="w-4 h-4" style={{ color: "var(--text-3)" }} />
+            </div>
+          )}
+          {/* Play overlay when audio available */}
+          {story.audioBlobUrl && (
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{ background: playerOpen ? "rgba(0,0,0,0.35)" : "rgba(0,0,0,0.18)" }}
+            >
+              <Play
+                className="w-3.5 h-3.5 text-white"
+                style={{ marginLeft: "1px", opacity: playerOpen ? 0 : 1, transition: "opacity 0.15s" }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* Text */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-semibold truncate" style={{ color: "var(--text-1)" }}>
+              {story.title}
+            </p>
+            {story.status === "tokenized" && (
+              <span className="flex-shrink-0 text-xs" style={{ color: "#a8edea" }}>◆</span>
+            )}
           </div>
-          <p className="font-semibold text-sm leading-snug mt-1" style={{ color: "var(--text-1)" }}>
-            {story.title}
+          <p className="text-xs truncate mt-0.5" style={{ color: "var(--text-3)" }}>
+            {meta}
           </p>
-          {story.authorTwitter ? (
-            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
-              by{" "}
-              <a
-                href={`https://x.com/${story.authorTwitter}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="hover:underline"
-                style={{ color: "var(--amber)" }}
-                onClick={(e) => e.stopPropagation()}
-              >
-                @{story.authorTwitter}
-              </a>
-            </p>
-          ) : story.authorWallet ? (
-            <p className="text-xs mt-0.5 font-mono" style={{ color: "var(--text-3)" }}>
-              {story.authorWallet.slice(0, 4)}…{story.authorWallet.slice(-4)}
-            </p>
-          ) : null}
-          <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--text-3)" }}>
-            {story.description}
-          </p>
+        </div>
+
+        {/* Action chip — primary CTA */}
+        <div className="flex items-center gap-1.5 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+          {story.tokenListingUrl && (
+            <a
+              href={story.tokenListingUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+            >
+              <ExternalLink className="w-3 h-3" /> Trade
+            </a>
+          )}
+          {!story.tokenMint && story.authorWallet === wallet && (
+            <Link
+              href={`/tokenize/${story.id}`}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
+              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+            >
+              <Zap className="w-3 h-3" /> Tokenize
+            </Link>
+          )}
+          {canSponsor && !story.tokenListingUrl && (
+            <Link
+              href={`/tokenize/${story.id}?sponsor=1`}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors"
+              style={{ background: "rgba(255,107,157,0.12)", color: "#ff6b9d" }}
+            >
+              <Zap className="w-3 h-3" /> Sponsor
+            </Link>
+          )}
+          <button onClick={handleFav} style={{ color: fav ? "#ff6b9d" : "var(--text-3)" }}>
+            <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
+          </button>
+          <button onClick={handleShare} style={{ color: "var(--text-3)" }}>
+            <XIcon className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
-      {story.audioBlobUrl && (
-        <AudioPlayer src={story.audioBlobUrl} durationSeconds={story.durationSeconds} />
+      {/* Inline player — slides open */}
+      {playerOpen && story.audioBlobUrl && (
+        <div className="px-3 pb-3">
+          <AudioPlayer src={story.audioBlobUrl} durationSeconds={story.durationSeconds} />
+        </div>
       )}
-
-      <div className="flex items-center gap-2">
-        {story.tokenListingUrl && (
-          <a
-            href={story.tokenListingUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
-            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
-          >
-            <ExternalLink className="w-3 h-3" /> Trade on Bags
-          </a>
-        )}
-        {!story.tokenMint && story.authorWallet === wallet && (
-          <Link
-            href={`/tokenize/${story.id}`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-opacity hover:opacity-80"
-            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
-          >
-            <Zap className="w-3 h-3" /> Tokenize
-          </Link>
-        )}
-        {canSponsor && (
-          <Link
-            href={`/tokenize/${story.id}?sponsor=1`}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-            style={{
-              background: "var(--surface-2)",
-              color: "var(--text-2)",
-              border: "1px solid var(--border)",
-            }}
-          >
-            <Zap className="w-3 h-3" style={{ color: "#ff6b9d" }} />
-            Sponsor
-          </Link>
-        )}
-        <button
-          onClick={handleShare}
-          className="ml-auto p-1.5 rounded-full transition-colors flex-shrink-0"
-          title="Share on X"
-          style={{ color: "var(--text-3)" }}
-        >
-          <XIcon className="w-3.5 h-3.5" />
-        </button>
-      </div>
     </div>
   );
 }
