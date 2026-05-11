@@ -10,7 +10,7 @@ const NAV = [
   { href: "/zone", icon: User, label: "Patio" },
 ] as const;
 
-const HIDDEN_ON = ["/record", "/evaluate/", "/tokenize/", "/list/", "/vote"];
+const HIDDEN_ON = ["/record", "/evaluate/", "/list/", "/vote"];
 
 export default function NavBar() {
   const pathname = usePathname();
