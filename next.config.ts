@@ -9,7 +9,7 @@ const nextConfig: NextConfig = {
   // @solana/web3.js and Anchor are used in API routes — let Node require them
   // natively instead of bundling them, which avoids re-compilation on every
   // server restart and halves bundle sizes.
-  serverExternalPackages: ["@solana/web3.js", "@coral-xyz/anchor"],
+  serverExternalPackages: ["@solana/web3.js", "@coral-xyz/anchor", "bs58"],
 
   // Turbopack (default in Next.js 16): alias Node-only built-ins to a browser
   // stub so the client bundle compiles without hanging on fs/net/tls.

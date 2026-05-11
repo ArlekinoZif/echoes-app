@@ -188,8 +188,9 @@ export default function TokenizePage({
           twitter: twitterHandle ? `@${twitterHandle}` : undefined,
         }),
       });
-      if (!infoRes.ok) throw new Error((await infoRes.json()).error ?? "Token info failed");
-      const { tokenMint, tokenMetadata } = await infoRes.json();
+      const infoData = await infoRes.json();
+      if (!infoRes.ok) throw new Error(`Step 1: ${infoData.error ?? "Token info failed"}`);
+      const { tokenMint, tokenMetadata } = infoData;
 
       // 3. Create fee-share config (before launch)
       const feeRes = await fetch("/api/bags/fee-config", {
@@ -203,8 +204,9 @@ export default function TokenizePage({
           sponsorWallet: isSponsor ? address : undefined,
         }),
       });
-      if (!feeRes.ok) throw new Error((await feeRes.json()).error ?? "Fee config failed");
-      const { meteoraConfigKey, transactions: feeTxs } = await feeRes.json();
+      const feeData = await feeRes.json();
+      if (!feeRes.ok) throw new Error(`Step 2: ${feeData.error ?? "Fee config failed"}`);
+      const { meteoraConfigKey, transactions: feeTxs } = feeData;
 
       // 4. Sign fee-share config transactions
       if (feeTxs?.length) await signAndSendAllBase64Txs(feeTxs);
@@ -220,8 +222,9 @@ export default function TokenizePage({
           configKey: meteoraConfigKey,
         }),
       });
-      if (!launchRes.ok) throw new Error((await launchRes.json()).error ?? "Launch failed");
-      const { transaction: launchTx } = await launchRes.json();
+      const launchData = await launchRes.json();
+      if (!launchRes.ok) throw new Error(`Step 3: ${launchData.error ?? "Launch failed"}`);
+      const { transaction: launchTx } = launchData;
 
       // 6. Sign + send launch transaction
       await signAndSendAllBase64Txs([launchTx]);
@@ -348,7 +351,7 @@ export default function TokenizePage({
                       </p>
                       {state.detail && (
                         <p
-                          className="text-xs mt-0.5 font-mono truncate max-w-xs"
+                          className="text-xs mt-0.5 font-mono break-all"
                           style={{ color: isError ? "#dc2626" : "var(--text-3)" }}
                         >
                           {state.detail}

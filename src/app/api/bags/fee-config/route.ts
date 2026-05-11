@@ -23,7 +23,6 @@ const PLATFORM_WALLET =
   "7PfDfuoNKzQCCxpRB5B6NFXq6RhuszYYBzbyrLLKkNhB";
 
 function txToBase64(tx: unknown): string {
-  console.log("txToBase64 input:", JSON.stringify(tx));
   let raw: string;
   if (typeof tx === "string") {
     raw = tx;
@@ -34,7 +33,12 @@ function txToBase64(tx: unknown): string {
     throw new Error(`Unexpected tx format: ${JSON.stringify(tx)}`);
   }
   if (!raw || typeof raw !== "string") throw new Error(`No string found in tx: ${JSON.stringify(tx)}`);
-  return Buffer.from(bs58.decode(raw)).toString("base64");
+  // Try bs58 → base64; if that fails assume already base64
+  try {
+    return Buffer.from(bs58.decode(raw)).toString("base64");
+  } catch {
+    return raw;
+  }
 }
 
 export async function POST(req: NextRequest) {

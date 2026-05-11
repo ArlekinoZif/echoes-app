@@ -61,14 +61,22 @@ export async function POST(req: NextRequest) {
     const data = await res.json();
     if (!data.success) {
       return NextResponse.json(
-        { error: data.error ?? "Launch transaction failed" },
+        { error: data.error ?? data.message ?? JSON.stringify(data) },
         { status: 502 }
       );
     }
 
-    // response is a base58-encoded transaction string
-    const txBase58: string = data.response;
-    const txBase64 = Buffer.from(bs58.decode(txBase58)).toString("base64");
+    // response may be base58 or base64 encoded
+    const rawTx: string = typeof data.response === "string"
+      ? data.response
+      : (data.response?.transaction ?? data.response?.tx ?? JSON.stringify(data.response));
+
+    let txBase64: string;
+    try {
+      txBase64 = Buffer.from(bs58.decode(rawTx)).toString("base64");
+    } catch {
+      txBase64 = rawTx; // already base64
+    }
 
     return NextResponse.json({ transaction: txBase64 });
   } catch (err) {
