@@ -85,7 +85,10 @@ export async function fetchPublicStories(): Promise<Story[]> {
 export async function fetchStoriesForEvaluation(
   excludeWallet?: string | null
 ): Promise<Story[]> {
-  let query = supabase.from("stories").select("*").eq("status", "pending_eval");
+  let query = supabase
+    .from("stories")
+    .select("*")
+    .in("status", ["pending_eval", "listed", "tokenized"]);
   if (excludeWallet) {
     query = query.neq("author_wallet", excludeWallet);
   }
