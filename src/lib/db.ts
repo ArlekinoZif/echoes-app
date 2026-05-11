@@ -41,8 +41,6 @@ function storyToRow(s: Story) {
     publish_gate: s.publishGate,
     status: s.status,
     author_wallet: s.authorWallet ?? null,
-    cover_image_url: s.coverImageUrl ?? null,
-    author_twitter: s.authorTwitter ?? null,
     listing_tx_sig: s.listingTxSig ?? null,
     ticker: s.ticker ?? null,
     token_mint: s.tokenMint ?? null,
@@ -50,6 +48,9 @@ function storyToRow(s: Story) {
     launch_type: s.launchType ?? null,
     sponsor_wallet: s.sponsorWallet ?? null,
     arweave_cid: s.arweaveCid ?? null,
+    // Only include these if the columns exist (migration required)
+    ...(s.coverImageUrl !== undefined && { cover_image_url: s.coverImageUrl }),
+    ...(s.authorTwitter !== undefined && { author_twitter: s.authorTwitter }),
   };
 }
 
