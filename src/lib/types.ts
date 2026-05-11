@@ -33,6 +33,9 @@ export interface Story {
   // Cover image (optional, uploaded at record time)
   coverImageUrl?: string;
 
+  // Author social identity (saved at record time from linked Privy accounts)
+  authorTwitter?: string;
+
   // Set after tokenization
   ticker?: string;
   tokenMint?: string;

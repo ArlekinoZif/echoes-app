@@ -7,6 +7,7 @@ import { Story, StoryCategory, PublishGate } from "@/lib/types";
 import { upsertStory } from "@/lib/db";
 import { uploadAudioToR2, uploadImageToR2 } from "@/lib/upload";
 import { useWallet } from "@/hooks/useWallet";
+import { usePrivy } from "@privy-io/react-auth";
 import { ArrowLeft, DollarSign, Users, Loader2, AlertCircle, ImageIcon, X } from "lucide-react";
 import Link from "next/link";
 import Image from "next/image";
@@ -31,6 +32,10 @@ export default function RecordPage() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const { address } = useWallet();
+  const { user } = usePrivy();
+  const twitterAccount = user?.linkedAccounts?.find((a) => a.type === "twitter_oauth") as
+    | { type: "twitter_oauth"; username?: string; name?: string }
+    | undefined;
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -97,6 +102,9 @@ export default function RecordPage() {
       status: gate === "pay" ? "draft" : "pending_eval",
       authorWallet: address ?? undefined,
       coverImageUrl,
+      authorTwitter: twitterAccount
+        ? (twitterAccount.username ?? twitterAccount.name ?? undefined)
+        : undefined,
     };
 
     try {

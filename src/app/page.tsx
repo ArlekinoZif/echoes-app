@@ -6,6 +6,7 @@ import { fetchPublicStories, fetchStoriesForSponsor, fetchFavourites, toggleFavo
 import { useWallet } from "@/hooks/useWallet";
 import { Story, StoryCategory } from "@/lib/types";
 import { Heart, ExternalLink, Zap, Mic, Search, SlidersHorizontal, X } from "lucide-react";
+import Image from "next/image";
 import AudioPlayer from "@/components/AudioPlayer";
 
 function XIcon({ className }: { className?: string }) {
@@ -55,7 +56,9 @@ function StoryCard({
       ? story.description.slice(0, 77) + "…"
       : story.description;
     const link = story.tokenListingUrl ?? "https://echoes.fans";
-    const text = `🎙️ "${story.title}" — a ${story.category} story on Echoes\n\n${desc}\n\nListen & trade: ${link}`;
+    const authorTag = story.authorTwitter ? `@${story.authorTwitter}` : null;
+    const byLine = authorTag ? ` by ${authorTag}` : "";
+    const text = `🎙️ "${story.title}"${byLine} — a ${story.category} story on Echoes\n\n${desc}\n\nListen & trade: ${link}`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`,
       "_blank",
@@ -68,45 +71,78 @@ function StoryCard({
       className="glass p-4 flex flex-col gap-3 transition-colors"
       style={{ borderRadius: "16px" }}
     >
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-start gap-3">
+        {/* Cover image thumbnail */}
+        {story.coverImageUrl && (
+          <Image
+            src={story.coverImageUrl}
+            alt="cover"
+            width={52}
+            height={52}
+            className="rounded-xl object-cover flex-shrink-0"
+            style={{ width: 52, height: 52 }}
+          />
+        )}
+
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span
-              className="text-xs font-medium px-2 py-0.5 rounded-full"
-              style={{ color: "var(--text-2)", background: "rgba(0,0,0,0.06)" }}
-            >
-              {story.category}
-            </span>
-            <span className="text-xs" style={{ color: "var(--text-3)" }}>
-              {fmt(story.durationSeconds)}
-            </span>
-            {story.status === "tokenized" && (
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-2 flex-wrap">
               <span
                 className="text-xs font-medium px-2 py-0.5 rounded-full"
-                style={{
-                  background: "linear-gradient(135deg, rgba(168,237,234,0.15), rgba(195,177,225,0.15))",
-                  color: "#a8edea",
-                  border: "1px solid rgba(168,237,234,0.2)",
-                }}
+                style={{ color: "var(--text-2)", background: "rgba(0,0,0,0.06)" }}
               >
-                ◆ tokenized
+                {story.category}
               </span>
-            )}
+              <span className="text-xs" style={{ color: "var(--text-3)" }}>
+                {fmt(story.durationSeconds)}
+              </span>
+              {story.status === "tokenized" && (
+                <span
+                  className="text-xs font-medium px-2 py-0.5 rounded-full"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(168,237,234,0.15), rgba(195,177,225,0.15))",
+                    color: "#a8edea",
+                    border: "1px solid rgba(168,237,234,0.2)",
+                  }}
+                >
+                  ◆ tokenized
+                </span>
+              )}
+            </div>
+            <button
+              onClick={handleFav}
+              className="p-1.5 rounded-full transition-colors flex-shrink-0"
+              style={{ color: fav ? "#fed6e3" : "var(--text-3)" }}
+            >
+              <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
+            </button>
           </div>
-          <p className="font-semibold text-sm leading-snug" style={{ color: "var(--text-1)" }}>
+          <p className="font-semibold text-sm leading-snug mt-1" style={{ color: "var(--text-1)" }}>
             {story.title}
           </p>
+          {story.authorTwitter ? (
+            <p className="text-xs mt-0.5" style={{ color: "var(--text-3)" }}>
+              by{" "}
+              <a
+                href={`https://x.com/${story.authorTwitter}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:underline"
+                style={{ color: "var(--amber)" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                @{story.authorTwitter}
+              </a>
+            </p>
+          ) : story.authorWallet ? (
+            <p className="text-xs mt-0.5 font-mono" style={{ color: "var(--text-3)" }}>
+              {story.authorWallet.slice(0, 4)}…{story.authorWallet.slice(-4)}
+            </p>
+          ) : null}
           <p className="text-xs mt-1 line-clamp-2" style={{ color: "var(--text-3)" }}>
             {story.description}
           </p>
         </div>
-        <button
-          onClick={handleFav}
-          className="p-1.5 rounded-full transition-colors flex-shrink-0"
-          style={{ color: fav ? "#fed6e3" : "var(--text-3)" }}
-        >
-          <Heart className={`w-4 h-4 ${fav ? "fill-current" : ""}`} />
-        </button>
       </div>
 
       {story.audioBlobUrl && (
