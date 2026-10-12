@@ -1,0 +1,5 @@
+# Production signing. Keep the real values outside the repository.
+RELEASE_STORE_FILE=/absolute/path/to/echoes-upload-key.jks
+RELEASE_STORE_PASSWORD=use-a-secret-manager
+RELEASE_KEY_ALIAS=echoes-upload
+RELEASE_KEY_PASSWORD=use-a-secret-manager

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="brand_bg">#0C0C0C</color>
+    <color name="brand_gold">#C8A84B</color>
+    <color name="brand_text">#EDEDED</color>
+    <color name="brand_muted">#8C8C8C</color>
+</resources>
