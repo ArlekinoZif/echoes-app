@@ -37,3 +37,20 @@ The author receives up to 0.75% of all trading volume, forever.
 # Test it
 
 App MVP is available at [app.echoes](https://app.echoes.fans/zone)
+
+# Android app (Solana Seeker)
+
+A native Kotlin and Jetpack Compose client for Echoes, built for Solana Mobile and Seeker owners. It signs in with Mobile Wallet Adapter (Seed Vault on a Seeker), records and plays stories, takes part in the weekly blind-vote pool, and pays listing and unlock fees by wallet signature.
+
+- **Download:** [Release v1.0.0-qa](https://github.com/ArlekinoZif/echoes-app/releases/tag/v1.0.0-qa), a debug-signed test build for sideloading (Android 8.0+).
+- **Source:** `android/`
+- **Architecture:** [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), including what is shipped, partial, and not built.
+- **Submission pack:** [docs/SUBMISSION.md](docs/SUBMISSION.md)
+- **Plans:** [docs/plans/](docs/plans/)
+- **Demo videos with voice-over and captions:** [demo/](demo/)
+
+## Honest status
+
+Verified on an Android emulator with a test wallet. Not yet verified on a physical Seeker with real Seed Vault. SKR tipping and in-app sponsored launches are not built. See the architecture document for the full list.
+
+Build: `cd android && ./gradlew assembleDebug`.

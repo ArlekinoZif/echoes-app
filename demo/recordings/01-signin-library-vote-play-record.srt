@@ -1,0 +1,52 @@
+1
+00:00:00,500 --> 00:00:07,826
+This is Echoes, a native Kotlin and Jetpack Compose app for Solana Mobile, where people record real stories and earn from them.
+
+2
+00:00:08,226 --> 00:00:19,209
+Sign-in uses Mobile Wallet Adapter. The server issues a challenge, and the wallet signs one login message. It is not a transaction and costs nothing. Here a test wallet stands in for Seed Vault.
+
+3
+00:00:19,609 --> 00:00:25,042
+Once signed in, the app keeps a secure session and loads the live library from the Echoes backend.
+
+4
+00:00:25,442 --> 00:00:31,828
+The Zone tab shows the connected wallet, an invite code for bringing friends, and optional profile details.
+
+5
+00:00:36,000 --> 00:00:41,329
+These let listeners find stories by audience, so the app stays useful beyond a single wallet.
+
+6
+00:00:41,729 --> 00:00:46,512
+Next, the Vote tab. Every week the community runs a blind vote on the pool of stories.
+
+7
+00:00:48,000 --> 00:00:54,200
+Votes stay sealed until the reveal phase, and the winning storyteller takes the prize pool, paid in SOL.
+
+8
+00:00:55,000 --> 00:00:57,299
+Back in the library, we open a story.
+
+9
+00:01:00,000 --> 00:01:05,306
+Each story has a cover, a description, and listener reviews for audio quality and storytelling.
+
+10
+00:01:10,000 --> 00:01:16,049
+Playback runs on Media3 ExoPlayer, with a progress bar, so audio can keep going with system media controls.
+
+11
+00:01:18,000 --> 00:01:21,680
+Now recording. Tapping Record starts the turntable and the microphone.
+
+12
+00:01:30,000 --> 00:01:34,621
+The tonearm drops and the take runs for up to ten minutes. It can be paused at any time.
+
+13
+00:01:41,000 --> 00:01:48,070
+When the take is finished, the sleeve opens. The creator adds a title, a description and a category, then chooses how to publish.
+

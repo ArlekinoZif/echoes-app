@@ -1,0 +1,24 @@
+1
+00:00:01,000 --> 00:00:11,112
+This is the wallet-signed payment flow. Creators can publish for free through community review, or pay a listing fee of twenty four hundred Echoes tokens to go live immediately.
+
+2
+00:00:17,000 --> 00:00:28,122
+The server builds the transaction and the wallet asks the user to approve it. The app never builds a transaction or picks an amount itself. Declining returns cleanly to the form, and nothing is spent.
+
+3
+00:00:34,000 --> 00:00:35,916
+Now we try again, and approve.
+
+4
+00:00:38,000 --> 00:00:44,223
+The wallet moves on to sending the transaction. For this demo, the send is simulated and nothing is submitted to mainnet.
+
+5
+00:00:46,000 --> 00:00:52,722
+In production, the app passes the signature to the server, which verifies the payment on-chain before the story is listed.
+
+6
+00:00:55,000 --> 00:00:58,982
+The app then returns to a fresh recording screen, ready for the next story.
+
