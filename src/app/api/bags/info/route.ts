@@ -10,12 +10,15 @@
  */
 
 import { NextRequest, NextResponse } from "next/server";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import { authErrorResponse, requireUser } from "@/lib/auth-server";
 
 const BAGS_API_URL =
   process.env.BAGS_API_URL ?? "https://public-api-v2.bags.fm/api/v1";
 const BAGS_API_KEY = process.env.BAGS_API_KEY ?? "";
 
 export async function POST(req: NextRequest) {
+  try { await requireUser(req); } catch (error) { return authErrorResponse(error); }
   try {
     const body = await req.json();
     const { name, symbol, description, imageBase64, imageUrl, twitter } = body;
@@ -25,6 +28,9 @@ export async function POST(req: NextRequest) {
         { error: "name, symbol and description are required" },
         { status: 400 }
       );
+    }
+    if (!BAGS_API_KEY) {
+      return NextResponse.json({ error: "Token launch is not configured" }, { status: 503 });
     }
 
     const formData = new FormData();
@@ -45,7 +51,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${BAGS_API_URL}/token-launch/create-token-info`,
       {
         method: "POST",

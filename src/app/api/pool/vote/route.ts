@@ -1,50 +1,50 @@
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "@/lib/pool-state";
+import { getPoolConfig, MIN_STAKED_SKR } from "@/lib/pool-config";
+import { dbSaveBallot } from "@/lib/db-server";
 import { getStakedSKR } from "@/lib/rpc";
-
-// Minimum SKR that must be staked in Seeker to participate in Echoes voting
-const MIN_STAKED_SKR = 1;
+import { assertOwnIdentity, authErrorResponse, requireUser } from "@/lib/auth-server";
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUser(req); } catch (error) { return authErrorResponse(error); }
+
   const body = await req.json();
   const { voter, commitment } = body;
-  // Accept both echoesAmount (new) and skrAmount (legacy) field names
-  const amount: number = body.echoesAmount ?? body.skrAmount;
-  if (!voter || !commitment || !amount) {
+  // Older clients send skrAmount; newer ones send echoesAmount.
+  const amount = Number(body.echoesAmount ?? body.skrAmount ?? 1);
+  if (!voter || !commitment) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
+  try { assertOwnIdentity(userId, voter); } catch (error) { return authErrorResponse(error); }
 
-  const now = Math.floor(Date.now() / 1000);
-  if (now >= pool.voteCloseAt) {
+  const config = getPoolConfig();
+  if (Math.floor(Date.now() / 1000) >= config.voteCloseAt) {
     return NextResponse.json({ error: "Voting closed" }, { status: 400 });
   }
-
-  const existing = pool.ballots.find((b) => b.voter === voter);
-  if (existing) {
-    return NextResponse.json({ error: "Already voted" }, { status: 409 });
-  }
-
-  if (amount < pool.skrVoteCost) {
+  if (config.voteCost > 0 && amount < config.voteCost) {
     return NextResponse.json(
-      { error: `Minimum ${pool.skrVoteCost} $ECHOES required` },
+      { error: `Minimum ${config.voteCost} $ECHOES required` },
       { status: 400 }
     );
   }
 
-  // Verify voter has staked SKR in the Seeker staking program
-  const { stakedUiAmount } = await getStakedSKR(voter);
-  if (stakedUiAmount < MIN_STAKED_SKR) {
-    return NextResponse.json(
-      {
-        error: `You need at least ${MIN_STAKED_SKR} SKR staked in Seeker to vote. Stake at seeker.app.`,
-        code: "INSUFFICIENT_STAKED_SKR",
-        stakedAmount: stakedUiAmount,
-      },
-      { status: 403 }
-    );
+  if (MIN_STAKED_SKR > 0) {
+    const { stakedUiAmount } = await getStakedSKR(voter);
+    if (stakedUiAmount < MIN_STAKED_SKR) {
+      return NextResponse.json(
+        {
+          error: `You need at least ${MIN_STAKED_SKR} SKR staked in Seeker to vote. Stake at seeker.app.`,
+          code: "INSUFFICIENT_STAKED_SKR",
+          stakedAmount: stakedUiAmount,
+        },
+        { status: 403 }
+      );
+    }
   }
 
-  pool.ballots.push({ voter, commitment, skrAmount: amount, revealed: false });
-
-  return NextResponse.json({ ok: true, totalVotes: pool.ballots.length });
+  const saved = await dbSaveBallot(config.poolId, voter, commitment, amount);
+  if (!saved.ok && saved.reason === "already_voted") {
+    return NextResponse.json({ error: "Already voted" }, { status: 409 });
+  }
+  return NextResponse.json({ ok: true });
 }

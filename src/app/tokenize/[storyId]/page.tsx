@@ -7,21 +7,13 @@ import Image from "next/image";
 import { fetchStory, upsertStory } from "@/lib/db";
 import { Story } from "@/lib/types";
 import { useWallet } from "@/hooks/useWallet";
-import { usePrivy, useLinkAccount } from "@privy-io/react-auth";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import {
   ArrowLeft, Wallet, Zap, CheckCircle, ExternalLink,
   Loader2, ImageIcon,
 } from "lucide-react";
 
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-      <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.744l7.737-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-    </svg>
-  );
-}
-
-type Step = "wallet" | "twitter" | "details" | "launch" | "done";
+type Step = "wallet" | "details" | "launch" | "done";
 type StepStatus = "idle" | "loading" | "done" | "error";
 
 interface StepState {
@@ -31,7 +23,6 @@ interface StepState {
 
 const STEP_META: { id: Step; label: string; icon: React.ReactNode }[] = [
   { id: "wallet", label: "Connect wallet", icon: <Wallet className="w-4 h-4" /> },
-  { id: "twitter", label: "Connect Twitter / X", icon: <XIcon className="w-4 h-4" /> },
   { id: "details", label: "Token details", icon: <ImageIcon className="w-4 h-4" /> },
   { id: "launch", label: "Launch on Bags App", icon: <Zap className="w-4 h-4" /> },
   { id: "done", label: "Done!", icon: <CheckCircle className="w-4 h-4" /> },
@@ -62,17 +53,10 @@ export default function TokenizePage({
   }, []);
 
   const { authenticated, address, connect, signAndSendAllBase64Txs } = useWallet();
-  const { user } = usePrivy();
-  const { linkTwitter } = useLinkAccount();
-
-  const twitterAccount = user?.linkedAccounts?.find((a) => a.type === "twitter_oauth") as
-    | { type: "twitter_oauth"; username?: string; name?: string }
-    | undefined;
 
   const [story, setStory] = useState<Story | null>(null);
   const [currentStep, setCurrentStep] = useState<Step>("wallet");
   const [stepStates, setStepStates] = useState<Record<Step, StepState>>(initStates());
-  const [linkingTwitter, setLinkingTwitter] = useState(false);
 
   const [ticker, setTicker] = useState("");
   const [coverImage, setCoverImage] = useState<File | null>(null);
@@ -88,19 +72,11 @@ export default function TokenizePage({
   );
 
   function advanceFromWallet() {
-    if (isSponsor) {
-      setStep("twitter", { status: "done", detail: "n/a" });
-      setCurrentStep("details");
-    } else if (twitterAccount) {
-      setStep("twitter", { status: "done", detail: "@" + (twitterAccount.username ?? twitterAccount.name) });
-      setCurrentStep("details");
-    } else {
-      setCurrentStep("twitter");
-    }
+    setCurrentStep("details");
   }
 
   useEffect(() => {
-    fetchStory(storyId).then((s) => {
+    fetchStory(storyId).then((s: Story | null) => {
       if (!s) { router.push("/"); return; }
       setStory(s);
       if (s.coverImageUrl) setCoverPreview(s.coverImageUrl);
@@ -109,12 +85,17 @@ export default function TokenizePage({
         advanceFromWallet();
       }
     });
-  }, [storyId, router, setStep, authenticated, address, twitterAccount, isSponsor]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [storyId, router, setStep, authenticated, address, isSponsor]);
 
   async function handleConnectWallet() {
     setStep("wallet", { status: "loading" });
     try {
       const addr = await connect();
+      if (!addr) {
+        // Don't advance with no wallet — that's what caused the launch to fail.
+        setStep("wallet", { status: "error", detail: "Couldn't connect a wallet. Tap to try again." });
+        return;
+      }
       setStep("wallet", { status: "done", detail: addr.slice(0, 6) + "…" + addr.slice(-4) });
       advanceFromWallet();
     } catch (e: unknown) {
@@ -122,23 +103,19 @@ export default function TokenizePage({
     }
   }
 
-  async function handleLinkTwitter() {
-    setLinkingTwitter(true);
-    try {
-      await linkTwitter();
-      // After linking, twitterAccount updates via Privy, but we can advance
-      setStep("twitter", { status: "done" });
-      setCurrentStep("details");
-    } catch (e: unknown) {
-      setStep("twitter", { status: "error", detail: toMsg(e) });
-    } finally {
-      setLinkingTwitter(false);
+  // Launch needs a wallet — if it's missing when the user hits Retry, connect
+  // one first instead of immediately erroring again.
+  async function handleRetryLaunch() {
+    let addr = address;
+    if (!addr) {
+      setStep("launch", { status: "loading" });
+      addr = await connect().catch(() => "");
+      if (!addr) {
+        setStep("launch", { status: "error", detail: "Couldn't connect a wallet. Reconnect on step 1." });
+        return;
+      }
     }
-  }
-
-  function handleSkipTwitter() {
-    setStep("twitter", { status: "done", detail: "skipped" });
-    setCurrentStep("details");
+    handleBagsLaunch(addr);
   }
 
   function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -158,12 +135,19 @@ export default function TokenizePage({
     handleBagsLaunch();
   }
 
-  async function handleBagsLaunch() {
-    if (!story || !address) return;
+  async function handleBagsLaunch(walletAddr: string | null = address) {
+    if (!story) return;
+    const wallet = walletAddr;
+    if (!wallet) {
+      // No wallet connected (e.g. email login) — surface it instead of hanging.
+      setCurrentStep("launch");
+      setStep("launch", { status: "error", detail: "No wallet connected. Go back to step 1 and connect a wallet to launch on Bags." });
+      return;
+    }
     setStep("launch", { status: "loading" });
     try {
       // 1. Cover image — use stored URL if available, otherwise encode uploaded file
-      let imageUrl: string | undefined = story.coverImageUrl;
+      const imageUrl: string | undefined = story.coverImageUrl;
       let imageBase64: string | undefined;
       if (!imageUrl && coverImage) {
         imageBase64 = await new Promise((resolve, reject) => {
@@ -175,8 +159,7 @@ export default function TokenizePage({
       }
 
       // 2. Create token info
-      const twitterHandle = twitterAccount?.username ?? twitterAccount?.name;
-      const infoRes = await fetch("/api/bags/info", {
+      const infoRes = await authenticatedFetch("/api/bags/info", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -185,7 +168,6 @@ export default function TokenizePage({
           description: story.description,
           imageUrl,
           imageBase64,
-          twitter: twitterHandle ? `@${twitterHandle}` : undefined,
         }),
       });
       const infoData = await infoRes.json();
@@ -193,15 +175,15 @@ export default function TokenizePage({
       const { tokenMint, tokenMetadata } = infoData;
 
       // 3. Create fee-share config (before launch)
-      const feeRes = await fetch("/api/bags/fee-config", {
+      const feeRes = await authenticatedFetch("/api/bags/fee-config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          payer: address,
+          payer: wallet,
           tokenMint,
           launchType: isSponsor ? "sponsor" : "author",
-          authorWallet: isSponsor ? (story.authorWallet ?? address) : address,
-          sponsorWallet: isSponsor ? address : undefined,
+          authorWallet: isSponsor ? (story.authorWallet ?? wallet) : wallet,
+          sponsorWallet: isSponsor ? wallet : undefined,
         }),
       });
       const feeData = await feeRes.json();
@@ -212,13 +194,13 @@ export default function TokenizePage({
       if (feeTxs?.length) await signAndSendAllBase64Txs(feeTxs);
 
       // 5. Create launch transaction
-      const launchRes = await fetch("/api/bags/launch-txs", {
+      const launchRes = await authenticatedFetch("/api/bags/launch-txs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           tokenMint,
           tokenMetadata,
-          wallet: address,
+          wallet,
           configKey: meteoraConfigKey,
         }),
       });
@@ -241,8 +223,8 @@ export default function TokenizePage({
         tokenMint,
         tokenListingUrl: listingUrl,
         launchType: isSponsor ? "sponsor" : "author",
-        authorWallet: isSponsor ? (story.authorWallet ?? address) : address,
-        sponsorWallet: isSponsor ? address : undefined,
+        authorWallet: isSponsor ? (story.authorWallet ?? wallet) : wallet,
+        sponsorWallet: isSponsor ? wallet : undefined,
       };
       await upsertStory(updated);
       setStory(updated);
@@ -263,14 +245,14 @@ export default function TokenizePage({
     : "Author 0.75% · Platform 0.25%";
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen">
       <div className="max-w-xl mx-auto px-4 py-10">
         {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <Link
             href="/"
             className="p-2 rounded-full transition-colors"
-            style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.07)", color: "var(--text-2)" }}
+            style={{ background: "rgba(20,20,20,0.95)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-2)" }}
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -292,10 +274,10 @@ export default function TokenizePage({
               style={{
                 background:
                   i < stepIdx
-                    ? "linear-gradient(90deg, #00c6be, #ff6b9d)"
+                    ? "linear-gradient(90deg, #c8a84b, #f0d080)"
                     : i === stepIdx
-                    ? "rgba(245,158,11,0.4)"
-                    : "rgba(0,0,0,0.08)",
+                    ? "rgba(200,168,75,0.35)"
+                    : "rgba(255,255,255,0.06)",
               }}
             />
           ))}
@@ -318,10 +300,10 @@ export default function TokenizePage({
                   isCurrent
                     ? { border: "1px solid rgba(245,158,11,0.4)", background: "rgba(245,158,11,0.04)" }
                     : isPast
-                    ? { border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.4)" }
+                    ? { border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.06)" }
                     : isError
                     ? { border: "1px solid rgba(239,68,68,0.3)", background: "rgba(239,68,68,0.04)" }
-                    : { border: "1px solid rgba(0,0,0,0.05)", background: "rgba(255,255,255,0.25)" }
+                    : { border: "1px solid rgba(255,255,255,0.05)", background: "rgba(255,255,255,0.03)" }
                 }
               >
                 <div className="flex items-center justify-between gap-3">
@@ -330,12 +312,12 @@ export default function TokenizePage({
                       className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0"
                       style={
                         isPast
-                          ? { background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }
+                          ? { background: "#c8a84b", color: "#0c0c0c" }
                           : isError
                           ? { background: "rgba(239,68,68,0.15)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.3)" }
                           : isCurrent
-                          ? { background: "rgba(255,107,157,0.12)", color: "#ff6b9d", border: "1px solid rgba(255,107,157,0.3)" }
-                          : { background: "rgba(0,0,0,0.05)", color: "var(--text-3)" }
+                          ? { background: "rgba(200,168,75,0.15)", color: "#c8a84b", border: "1px solid rgba(200,168,75,0.35)" }
+                          : { background: "rgba(255,255,255,0.06)", color: "var(--text-3)", border: "1px solid rgba(255,255,255,0.08)" }
                       }
                     >
                       {isPast ? "✓" : isError ? "!" : i + 1}
@@ -367,40 +349,10 @@ export default function TokenizePage({
                 {isCurrent && s.id === "wallet" && (
                   <button
                     onClick={handleConnectWallet}
-                    className="mt-4 w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
-                    style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                    className="btn-gold mt-4 w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
                   >
                     Connect wallet
                   </button>
-                )}
-
-                {isCurrent && s.id === "twitter" && (
-                  <div className="mt-4 flex flex-col gap-2">
-                    <p className="text-xs" style={{ color: "var(--text-3)" }}>
-                      Bags App uses your Twitter handle for the token page. Required to launch.
-                    </p>
-                    <button
-                      onClick={handleLinkTwitter}
-                      disabled={linkingTwitter}
-                      className="w-full py-2.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-50"
-                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
-                    >
-                      {linkingTwitter ? (
-                        <span className="flex items-center justify-center gap-2">
-                          <Loader2 className="w-4 h-4 animate-spin" /> Connecting…
-                        </span>
-                      ) : (
-                        "Connect Twitter / X"
-                      )}
-                    </button>
-                    <button
-                      onClick={handleSkipTwitter}
-                      className="w-full py-2 rounded-xl text-sm font-medium transition-colors"
-                      style={{ color: "var(--text-3)", background: "transparent" }}
-                    >
-                      Skip for now
-                    </button>
-                  </div>
                 )}
 
                 {isCurrent && s.id === "details" && (
@@ -423,8 +375,8 @@ export default function TokenizePage({
                         required
                         className="w-full px-3 py-2.5 rounded-xl font-mono uppercase text-sm focus:outline-none transition-colors"
                         style={{
-                          background: "rgba(255,255,255,0.7)",
-                          border: "1px solid rgba(0,0,0,0.1)",
+                          background: "rgba(255,255,255,0.04)",
+                          border: "1px solid rgba(255,255,255,0.1)",
                           color: "var(--text-1)",
                         }}
                       />
@@ -436,7 +388,7 @@ export default function TokenizePage({
                       </label>
                       <label
                         className="flex items-center gap-3 cursor-pointer p-3 rounded-xl transition-colors"
-                        style={{ border: "1px dashed rgba(0,0,0,0.15)", background: "rgba(255,255,255,0.5)" }}
+                        style={{ border: "1px dashed rgba(255,255,255,0.15)", background: "rgba(255,255,255,0.02)" }}
                       >
                         {coverPreview ? (
                           <Image
@@ -449,7 +401,7 @@ export default function TokenizePage({
                         ) : (
                           <div
                             className="w-12 h-12 rounded-lg flex items-center justify-center"
-                            style={{ background: "rgba(0,0,0,0.06)" }}
+                            style={{ background: "rgba(255,255,255,0.04)" }}
                           >
                             <ImageIcon className="w-5 h-5" style={{ color: "var(--text-3)" }} />
                           </div>
@@ -467,8 +419,7 @@ export default function TokenizePage({
                     </div>
                     <button
                       type="submit"
-                      className="w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
-                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                      className="btn-gold w-full py-2.5 rounded-xl font-semibold text-sm transition-colors"
                     >
                       Launch on Bags →
                     </button>
@@ -477,7 +428,7 @@ export default function TokenizePage({
 
                 {isError && s.id === "launch" && (
                   <button
-                    onClick={() => handleBagsLaunch()}
+                    onClick={handleRetryLaunch}
                     className="mt-4 w-full py-2 rounded-xl text-sm font-semibold transition-colors"
                     style={{ background: "rgba(239,68,68,0.12)", color: "#dc2626", border: "1px solid rgba(239,68,68,0.2)" }}
                   >
@@ -505,8 +456,7 @@ export default function TokenizePage({
                   href={bagsUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                  className="btn-gold flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-colors"
                 >
                   <ExternalLink className="w-4 h-4" /> Trade on Bags App
                 </a>

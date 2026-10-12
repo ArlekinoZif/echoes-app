@@ -14,12 +14,15 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import bs58 from "bs58";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import { AuthenticationError, assertOwnIdentity, authErrorResponse, requireUser } from "@/lib/auth-server";
+import { runtimeEnv } from "@/lib/runtime-env";
 
 const BAGS_API_URL =
   process.env.BAGS_API_URL ?? "https://public-api-v2.bags.fm/api/v1";
 const BAGS_API_KEY = process.env.BAGS_API_KEY ?? "";
 const PLATFORM_WALLET =
-  process.env.NEXT_PUBLIC_PLATFORM_WALLET ??
+  runtimeEnv("NEXT_PUBLIC_PLATFORM_WALLET") ??
   "7PfDfuoNKzQCCxpRB5B6NFXq6RhuszYYBzbyrLLKkNhB";
 
 function txToBase64(tx: unknown): string {
@@ -42,6 +45,8 @@ function txToBase64(tx: unknown): string {
 }
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUser(req); } catch (error) { return authErrorResponse(error); }
   try {
     const { payer, tokenMint, launchType, authorWallet, sponsorWallet } =
       await req.json();
@@ -51,6 +56,10 @@ export async function POST(req: NextRequest) {
         { error: "payer, tokenMint, launchType and authorWallet are required" },
         { status: 400 }
       );
+    }
+    assertOwnIdentity(userId, payer);
+    if (!BAGS_API_KEY) {
+      return NextResponse.json({ error: "Token launch is not configured" }, { status: 503 });
     }
 
     let claimersArray: string[];
@@ -70,18 +79,21 @@ export async function POST(req: NextRequest) {
       basisPointsArray = [5000, 2500, 2500];
     }
 
-    const res = await fetch(`${BAGS_API_URL}/fee-share/config`, {
+    const reqBody = {
+      payer,
+      baseMint: tokenMint,
+      claimersArray,
+      basisPointsArray,
+    };
+    console.log("bags/fee-config → sending to", `${BAGS_API_URL}/fee-share/config`, JSON.stringify(reqBody));
+
+    const res = await fetchWithTimeout(`${BAGS_API_URL}/fee-share/config`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "x-api-key": BAGS_API_KEY,
       },
-      body: JSON.stringify({
-        payer,
-        baseMint: tokenMint,
-        claimersArray,
-        basisPointsArray,
-      }),
+      body: JSON.stringify(reqBody),
     });
 
     if (!res.ok) {
@@ -126,6 +138,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ meteoraConfigKey, transactions: txBase64s, needsCreation });
   } catch (err) {
+    if (err instanceof AuthenticationError) return authErrorResponse(err);
     const msg = err instanceof Error ? err.message : String(err);
     console.error("bags/fee-config error:", msg);
     return NextResponse.json({ error: `bags/fee-config: ${msg}` }, { status: 500 });

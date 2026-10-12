@@ -1,186 +1,97 @@
 "use client";
 
-import { supabase } from "./supabase";
+// Client-side DB layer — calls Next.js API routes backed by Cloudflare D1
+// No direct DB access from the browser
+
 import { Story, Evaluation } from "./types";
+import { authenticatedFetch } from "./authenticated-fetch";
 
-// ── Row → domain mappers ───────────────────────────────────────────────────
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function rowToStory(row: any): Story {
-  return {
-    id: row.id,
-    title: row.title,
-    description: row.description,
-    category: row.category,
-    audioBlobUrl: row.audio_url,
-    durationSeconds: row.duration_secs,
-    publishGate: row.publish_gate,
-    createdAt: new Date(row.created_at).getTime(),
-    status: row.status,
-    authorWallet: row.author_wallet ?? undefined,
-    coverImageUrl: row.cover_image_url ?? undefined,
-    authorTwitter: row.author_twitter ?? undefined,
-    listingTxSig: row.listing_tx_sig ?? undefined,
-    ticker: row.ticker ?? undefined,
-    tokenMint: row.token_mint ?? undefined,
-    tokenListingUrl: row.token_listing_url ?? undefined,
-    launchType: row.launch_type ?? undefined,
-    sponsorWallet: row.sponsor_wallet ?? undefined,
-    arweaveCid: row.arweave_cid ?? undefined,
-  };
-}
-
-function storyToRow(s: Story) {
-  return {
-    id: s.id,
-    title: s.title,
-    description: s.description,
-    category: s.category,
-    audio_url: s.audioBlobUrl,
-    duration_secs: s.durationSeconds,
-    publish_gate: s.publishGate,
-    status: s.status,
-    author_wallet: s.authorWallet ?? null,
-    listing_tx_sig: s.listingTxSig ?? null,
-    ticker: s.ticker ?? null,
-    token_mint: s.tokenMint ?? null,
-    token_listing_url: s.tokenListingUrl ?? null,
-    launch_type: s.launchType ?? null,
-    sponsor_wallet: s.sponsorWallet ?? null,
-    arweave_cid: s.arweaveCid ?? null,
-    // Only include these if the columns exist (migration required)
-    ...(s.coverImageUrl !== undefined && { cover_image_url: s.coverImageUrl }),
-    ...(s.authorTwitter !== undefined && { author_twitter: s.authorTwitter }),
-  };
-}
-
-// ── Stories ────────────────────────────────────────────────────────────────
-
-export async function upsertStory(story: Story): Promise<void> {
-  const { error } = await supabase
-    .from("stories")
-    .upsert(storyToRow(story), { onConflict: "id" });
-  if (error) throw error;
-}
-
-export async function fetchStory(id: string): Promise<Story | null> {
-  const { data, error } = await supabase
-    .from("stories")
-    .select("*")
-    .eq("id", id)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? rowToStory(data) : null;
-}
-
-export async function fetchPublicStories(): Promise<Story[]> {
-  const { data, error } = await supabase
-    .from("stories")
-    .select("*")
-    .in("status", ["listed", "tokenized"])
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(rowToStory);
-}
-
-export async function fetchStoriesForEvaluation(): Promise<Story[]> {
-  const { data, error } = await supabase
-    .from("stories")
-    .select("*")
-    .in("status", ["pending_eval", "listed", "tokenized"])
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(rowToStory);
-}
-
-export async function fetchStoriesForSponsor(
-  myWallet?: string | null
-): Promise<Story[]> {
-  let query = supabase
-    .from("stories")
-    .select("*")
-    .eq("status", "listed")
-    .is("token_mint", null);
-  if (myWallet) {
-    query = query.neq("author_wallet", myWallet);
+async function api<T>(path: string, opts?: RequestInit): Promise<T> {
+  const res = await authenticatedFetch(path, opts);
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error: string }).error ?? res.statusText);
   }
-  const { data, error } = await query;
-  if (error) throw error;
-  return (data ?? []).map(rowToStory);
+  return res.json() as Promise<T>;
 }
 
-/** All stories authored by this wallet (any status) */
-export async function fetchMyStories(wallet: string): Promise<Story[]> {
-  const { data, error } = await supabase
-    .from("stories")
-    .select("*")
-    .eq("author_wallet", wallet)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return (data ?? []).map(rowToStory);
+// ── Stories ───────────────────────────────────────────────────────────────────
+
+export function fetchStory(id: string): Promise<Story | null> {
+  return api<Story>(`/api/stories/${id}`).catch(() => null);
 }
 
-// ── Evaluations ────────────────────────────────────────────────────────────
+export function fetchPublicStories(): Promise<Story[]> {
+  return api("/api/stories?type=public");
+}
 
-export async function upsertEvaluation(
-  evaluation: Evaluation,
-  evaluatorWallet: string
-): Promise<void> {
-  const { error } = await supabase.from("evaluations").upsert(
-    {
-      story_id: evaluation.storyId,
-      evaluator_wallet: evaluatorWallet,
-      audio_quality: evaluation.criteria.audioQuality,
-      storytelling: evaluation.criteria.storytelling,
-      description_accuracy: evaluation.criteria.descriptionAccuracy,
-      listened_percent: evaluation.listenedPercent,
-    },
-    { onConflict: "story_id,evaluator_wallet" }
+export function fetchTopStories(): Promise<Story[]> {
+  return api("/api/stories?type=top");
+}
+
+export function fetchStoriesForEvaluation(): Promise<Story[]> {
+  return api("/api/stories?type=evaluate");
+}
+
+export function fetchStoriesForSponsor(wallet?: string | null): Promise<Story[]> {
+  const q = wallet ? `&wallet=${encodeURIComponent(wallet)}` : "";
+  return api(`/api/stories?type=sponsor${q}`);
+}
+
+export function fetchMyStories(wallet: string): Promise<Story[]> {
+  return api(`/api/stories?type=mine&wallet=${encodeURIComponent(wallet)}`);
+}
+
+export function upsertStory(story: Story): Promise<void> {
+  return api("/api/stories", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(story),
+  });
+}
+
+// ── Evaluations ───────────────────────────────────────────────────────────────
+
+export function fetchMyEvaluatedIds(wallet: string): Promise<string[]> {
+  return api(`/api/evaluations?wallet=${encodeURIComponent(wallet)}`);
+}
+
+export function upsertEvaluation(evaluation: Evaluation, evaluatorWallet: string): Promise<void> {
+  return api("/api/evaluations", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ evaluation, evaluatorWallet }),
+  });
+}
+
+// ── Favourites ────────────────────────────────────────────────────────────────
+
+export function fetchFavourites(wallet: string): Promise<string[]> {
+  return api(`/api/favourites?wallet=${encodeURIComponent(wallet)}`);
+}
+
+export async function toggleFavouriteDb(storyId: string, wallet: string): Promise<boolean> {
+  const result = await api<{ isFav: boolean }>("/api/favourites", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storyId, wallet }),
+  });
+  return result.isFav;
+}
+
+// ── Private unlocks ───────────────────────────────────────────────────────────
+
+export async function checkUnlock(storyId: string, wallet: string): Promise<boolean> {
+  const result = await api<{ unlocked: boolean }>(
+    `/api/unlock?storyId=${encodeURIComponent(storyId)}&wallet=${encodeURIComponent(wallet)}`
   );
-  if (error) throw error;
+  return result.unlocked;
 }
 
-/** Returns story IDs this wallet has evaluated */
-export async function fetchMyEvaluatedIds(wallet: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("evaluations")
-    .select("story_id")
-    .eq("evaluator_wallet", wallet);
-  if (error) throw error;
-  return (data ?? []).map((r) => r.story_id);
-}
-
-// ── Favourites ─────────────────────────────────────────────────────────────
-
-export async function fetchFavourites(wallet: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from("favourites")
-    .select("story_id")
-    .eq("wallet", wallet);
-  if (error) throw error;
-  return (data ?? []).map((r) => r.story_id);
-}
-
-export async function toggleFavouriteDb(
-  storyId: string,
-  wallet: string
-): Promise<boolean> {
-  const { data } = await supabase
-    .from("favourites")
-    .select("story_id")
-    .eq("wallet", wallet)
-    .eq("story_id", storyId)
-    .maybeSingle();
-
-  if (data) {
-    await supabase
-      .from("favourites")
-      .delete()
-      .eq("wallet", wallet)
-      .eq("story_id", storyId);
-    return false;
-  } else {
-    await supabase.from("favourites").insert({ wallet, story_id: storyId });
-    return true;
-  }
+export function recordUnlock(storyId: string, wallet: string, txSig: string): Promise<void> {
+  return api("/api/unlock", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ storyId, wallet, txSig }),
+  });
 }

@@ -1,14 +1,11 @@
 import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import { SKR_STAKING_PROGRAM, SKR_STAKE_CONFIG } from "@/lib/seeker";
 import { fetchSeekerStakeAccount } from "@/lib/seeker-idl";
-
-const RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ??
-  "https://api.mainnet-beta.solana.com";
+import { getRpcUrl } from "@/lib/rpcUrl";
 
 let _connection: Connection | null = null;
 export function getConnection(): Connection {
-  if (!_connection) _connection = new Connection(RPC_URL, "confirmed");
+  if (!_connection) _connection = new Connection(getRpcUrl(), "confirmed");
   return _connection;
 }
 

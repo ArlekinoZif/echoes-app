@@ -3,24 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
-  fetchStoriesForEvaluation,
-  fetchStoriesForSponsor,
-  fetchMyEvaluatedIds,
-  fetchMyStories,
-  upsertStory,
+  fetchStoriesForEvaluation, fetchStoriesForSponsor,
+  fetchMyEvaluatedIds, fetchMyStories, upsertStory,
 } from "@/lib/db";
-import { useWallet } from "@/hooks/useWallet";
+import { useIdentity } from "@/hooks/useIdentity";
 import { Story } from "@/lib/types";
 import { ArrowLeft, Mic, CheckCircle, Zap } from "lucide-react";
 
 const REQUIRED = 3;
-
-function fmt(s: number) {
-  return `${Math.floor(s / 60)}m ${s % 60}s`;
-}
+function fmt(s: number) { return `${Math.floor(s / 60)}m ${s % 60}s`; }
 
 export default function EvaluatePage() {
-  const { address } = useWallet();
+  const { userId } = useIdentity();
   const [evalStories, setEvalStories] = useState<Story[]>([]);
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [sponsorable, setSponsorable] = useState<Story[]>([]);
@@ -34,187 +28,146 @@ export default function EvaluatePage() {
       wallet ? fetchMyEvaluatedIds(wallet) : Promise.resolve([] as string[]),
       wallet ? fetchMyStories(wallet) : Promise.resolve([] as Story[]),
     ]);
-
     setEvalStories(available);
     setCompletedIds(new Set(evalledIds));
     setSponsorable(sponsorList);
-
-    const pending = myStories.filter((s) => s.status === "pending_eval");
+    const pending = myStories.filter(s => s.status === "pending_eval");
     setMyPendingCount(pending.length);
     setFirstPendingId(pending[0]?.id ?? null);
   }
 
-  useEffect(() => {
-    refresh(address);
-  }, [address]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { refresh(userId); }, [userId]);  
 
-  const evaluated = evalStories.filter((s) => completedIds.has(s.id)).length;
+  const evaluated = evalStories.filter(s => completedIds.has(s.id)).length;
   const unlocked = evaluated >= REQUIRED;
-
-  useEffect(() => {
-    if (!unlocked || !address) return;
-    fetchMyStories(address).then(async (mine) => {
-      const pending = mine.filter((s) => s.status === "pending_eval");
-      if (pending.length === 0) return;
-      await Promise.all(pending.map((s) => upsertStory({ ...s, status: "listed" })));
-      refresh(address);
-    });
-  }, [unlocked, address]); // eslint-disable-line react-hooks/exhaustive-deps
-
   const remaining = REQUIRED - evaluated;
 
+  useEffect(() => {
+    if (!unlocked || !userId) return;
+    fetchMyStories(userId).then(async mine => {
+      const pending = mine.filter(s => s.status === "pending_eval");
+      if (!pending.length) return;
+      await Promise.all(pending.map(s => upsertStory({ ...s, status: "listed" })));
+      refresh(userId);
+    });
+  }, [unlocked, userId]);  
+
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
-      <div className="max-w-xl mx-auto px-4 py-10">
+    <div className="min-h-screen">
+      <div className="max-w-2xl mx-auto px-6 py-6">
         {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <Link
-            href="/"
-            className="p-2 rounded-full transition-colors"
-            style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.07)", color: "var(--text-2)" }}
-          >
+        <div className="flex items-center gap-3 mb-6">
+          <Link href="/" className="p-2 rounded-full transition-colors"
+            style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-2)" }}>
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="text-2xl font-bold" style={{ color: "var(--text-1)" }}>Evaluate stories</h1>
-            <p className="text-sm" style={{ color: "var(--text-3)" }}>
-              {evaluated}/{REQUIRED} completed
-            </p>
+            <h1 className="text-xl font-bold" style={{ color: "var(--text-1)" }}>Evaluate stories</h1>
+            <p className="text-sm" style={{ color: "var(--text-3)" }}>{evaluated}/{REQUIRED} completed</p>
           </div>
         </div>
 
         {/* Pending notice */}
         {myPendingCount > 0 && (
-          <div
-            className="p-4 rounded-2xl mb-6"
-            style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.3)" }}
-          >
-            <p className="text-sm font-medium" style={{ color: "var(--amber)" }}>
+          <div className="p-4 rounded-2xl mb-5"
+            style={{ background: "rgba(245,200,66,0.06)", border: "1px solid rgba(245,200,66,0.2)" }}>
+            <p className="text-sm font-semibold" style={{ color: "var(--amber)" }}>
               You have {myPendingCount} story{myPendingCount > 1 ? " stories" : ""} waiting to be listed.
             </p>
-            <p className="text-xs mt-1" style={{ color: "rgba(245,158,11,0.7)" }}>
+            <p className="text-xs mt-1" style={{ color: "rgba(245,200,66,0.6)" }}>
               Evaluate {remaining} more {remaining === 1 ? "story" : "stories"} to publish yours for free.
             </p>
           </div>
         )}
 
         {/* Progress bar */}
-        <div
-          className="h-1.5 rounded-full mb-6 overflow-hidden"
-          style={{ background: "rgba(0,0,0,0.08)" }}
-        >
-          <div
-            className="h-full rounded-full transition-all"
-            style={{
-              width: `${Math.min(1, evaluated / REQUIRED) * 100}%`,
-              background: "linear-gradient(90deg, #00c6be, #ff6b9d)",
-            }}
-          />
+        <div className="h-1 rounded-full mb-6 overflow-hidden" style={{ background: "rgba(255,255,255,0.08)" }}>
+          <div className="h-full rounded-full transition-all"
+            style={{ width: `${Math.min(1, evaluated / REQUIRED) * 100}%`, background: "rgba(255,255,255,0.5)" }} />
         </div>
 
-        {/* Completed state */}
+        {/* Done */}
         {unlocked ? (
-          <div className="text-center py-12 flex flex-col items-center gap-4 mb-8">
-            <CheckCircle className="w-14 h-14" style={{ color: "var(--amber)" }} />
-            <h2 className="text-xl font-bold" style={{ color: "var(--text-1)" }}>Reviews done!</h2>
-            <p className="text-sm" style={{ color: "var(--text-2)" }}>
-              Your story has been listed and entered into the weekly ECHOES event.
-            </p>
-            <Link
-              href="/"
-              className="mt-2 px-6 py-3 rounded-full font-semibold transition-colors"
-              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
-            >
+          <div className="text-center py-16 flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center"
+              style={{ background: "rgba(245,200,66,0.1)", border: "1px solid rgba(245,200,66,0.2)" }}>
+              <CheckCircle className="w-8 h-8" style={{ color: "var(--amber)" }} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold" style={{ color: "var(--text-1)" }}>Reviews done!</h2>
+              <p className="text-sm mt-1" style={{ color: "var(--text-2)" }}>
+                Your story has been listed and entered into the weekly ECHOES event.
+              </p>
+            </div>
+            <Link href="/"
+              className="btn-gold mt-2 px-6 py-3 rounded-full font-bold text-sm active:scale-95 transition-all">
               Back to Library
             </Link>
           </div>
+
         ) : evalStories.length === 0 ? (
-          <div className="flex flex-col gap-4 mb-8">
-            {/* If user has a pending story — show pay-to-list as the primary action */}
+          <div className="flex flex-col gap-4">
             {myPendingCount > 0 && firstPendingId ? (
               <>
-                <div
-                  className="p-5 rounded-2xl"
-                  style={{ background: "rgba(245,158,11,0.06)", border: "1px solid rgba(245,158,11,0.3)" }}
-                >
+                <div className="p-5 rounded-2xl"
+                  style={{ background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)" }}>
                   <p className="font-semibold text-sm mb-1" style={{ color: "var(--text-1)" }}>
                     No stories to review right now
                   </p>
                   <p className="text-sm" style={{ color: "var(--text-2)" }}>
-                    The evaluation queue is empty — no other stories are waiting for review yet.
-                    You can skip the queue and list your story immediately for 2400 $ECHOES.
+                    The queue is empty. You can skip and list your story immediately for 2400 $ECHOES.
                   </p>
                 </div>
-                <Link
-                  href={`/list/${firstPendingId}`}
-                  className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold text-sm transition-opacity hover:opacity-80"
-                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
-                >
+                <Link href={`/list/${firstPendingId}`}
+                  className="btn-gold flex items-center justify-center gap-2 w-full py-3.5 rounded-xl font-bold text-sm">
                   Pay 2400 $ECHOES — list my story now
                 </Link>
-                <p className="text-xs text-center" style={{ color: "var(--text-3)" }}>
-                  Or check back later when more stories are submitted for evaluation.
-                </p>
               </>
             ) : (
-              <div className="text-center py-12 flex flex-col items-center gap-3">
-                <div
-                  className="w-16 h-16 rounded-full flex items-center justify-center"
-                  style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.06)" }}
-                >
+              <div className="text-center py-16 flex flex-col items-center gap-3">
+                <div className="w-16 h-16 rounded-full flex items-center justify-center"
+                  style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}>
                   <Mic className="w-6 h-6" style={{ color: "var(--text-3)" }} />
                 </div>
                 <p className="text-sm" style={{ color: "var(--text-2)" }}>No stories available for evaluation yet.</p>
-                <p className="text-xs" style={{ color: "var(--text-3)" }}>Check back soon — more stories are being submitted.</p>
+                <p className="text-xs" style={{ color: "var(--text-3)" }}>Check back soon.</p>
               </div>
             )}
           </div>
+
         ) : (
           <div className="flex flex-col gap-3 mb-8">
             <p className="text-sm mb-1" style={{ color: "var(--text-2)" }}>
               Evaluate {remaining} more {remaining === 1 ? "story" : "stories"} to list yours.
             </p>
-            {evalStories.map((story) => {
+            {evalStories.map(story => {
               const done = completedIds.has(story.id);
               return (
-                <Link
-                  key={story.id}
-                  href={done ? "#" : `/evaluate/${story.id}`}
-                  className="p-5 rounded-2xl transition-colors"
-                  style={
-                    done
-                      ? { border: "1px solid rgba(245,158,11,0.25)", background: "rgba(245,158,11,0.04)", cursor: "default" }
-                      : { border: "1px solid rgba(0,0,0,0.07)", background: "rgba(255,255,255,0.6)", cursor: "pointer" }
-                  }
-                >
+                <Link key={story.id} href={done ? "#" : `/evaluate/${story.id}`}
+                  className="p-4 rounded-2xl transition-all"
+                  style={done
+                    ? { border: "1px solid rgba(245,200,66,0.2)", background: "rgba(245,200,66,0.04)", cursor: "default" }
+                    : { border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", cursor: "pointer" }
+                  }>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className="text-xs font-medium px-2 py-0.5 rounded-full"
-                          style={{ color: "var(--amber)", background: "rgba(245,158,11,0.1)" }}
-                        >
+                      <div className="flex items-center gap-2 mb-1.5">
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                          style={{ color: "var(--amber)", background: "rgba(245,200,66,0.1)" }}>
                           {story.category}
                         </span>
-                        <span className="text-xs" style={{ color: "var(--text-3)" }}>
-                          {fmt(story.durationSeconds)}
-                        </span>
+                        <span className="text-xs" style={{ color: "var(--text-3)" }}>{fmt(story.durationSeconds)}</span>
                       </div>
                       <p className="font-semibold truncate" style={{ color: "var(--text-1)" }}>{story.title}</p>
-                      <p className="text-sm mt-1 line-clamp-2" style={{ color: "var(--text-2)" }}>
-                        {story.description}
-                      </p>
+                      <p className="text-sm mt-1 line-clamp-2" style={{ color: "var(--text-2)" }}>{story.description}</p>
                     </div>
-                    {done ? (
-                      <CheckCircle className="w-5 h-5 flex-shrink-0 mt-0.5" style={{ color: "var(--amber)" }} />
-                    ) : (
-                      <span
-                        className="text-xs px-3 py-1 rounded-full flex-shrink-0"
-                        style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-2)" }}
-                      >
-                        Evaluate
-                      </span>
-                    )}
+                    {done
+                      ? <CheckCircle className="w-5 h-5 flex-shrink-0 mt-1" style={{ color: "var(--amber)" }} />
+                      : <span className="text-xs px-3 py-1 rounded-full flex-shrink-0 mt-1"
+                          style={{ background: "rgba(255,255,255,0.06)", color: "var(--text-2)", border: "1px solid rgba(255,255,255,0.1)" }}>
+                          Evaluate →
+                        </span>
+                    }
                   </div>
                 </Link>
               );
@@ -222,52 +175,38 @@ export default function EvaluatePage() {
           </div>
         )}
 
-        {/* Sponsor section */}
+        {/* Sponsor */}
         {sponsorable.length > 0 && (
-          <div>
+          <div className="mt-4">
             <div className="flex items-center gap-2 mb-2">
               <Zap className="w-4 h-4" style={{ color: "var(--amber)" }} />
-              <h2 className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>
-                Sponsor a story — earn 50% forever
-              </h2>
+              <h2 className="text-sm font-semibold" style={{ color: "var(--text-2)" }}>Sponsor a story — earn 50% forever</h2>
             </div>
             <p className="text-xs mb-4" style={{ color: "var(--text-3)" }}>
-              These listed stories aren&apos;t tokenized yet. Pay for the Bags launch and receive 50% of all trading fees — permanently.
+              Pay for the Bags launch and receive 50% of all trading fees — permanently.
             </p>
             <div className="flex flex-col gap-3">
-              {sponsorable.map((story) => (
-                <div key={story.id} className="glass p-5 rounded-2xl">
-                  <div className="flex items-start justify-between gap-3">
+              {sponsorable.map(story => (
+                <div key={story.id} className="glass p-4 rounded-2xl">
+                  <div className="flex items-start gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <span
-                          className="text-xs font-medium px-2 py-0.5 rounded-full"
-                          style={{ color: "var(--amber)", background: "rgba(245,158,11,0.1)" }}
-                        >
+                        <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                          style={{ color: "var(--amber)", background: "rgba(245,200,66,0.1)" }}>
                           {story.category}
                         </span>
-                        <span className="text-xs" style={{ color: "var(--text-3)" }}>
-                          {fmt(story.durationSeconds)}
-                        </span>
+                        <span className="text-xs" style={{ color: "var(--text-3)" }}>{fmt(story.durationSeconds)}</span>
                       </div>
                       <p className="font-semibold truncate" style={{ color: "var(--text-1)" }}>{story.title}</p>
-                      <p className="text-sm mt-1 line-clamp-2" style={{ color: "var(--text-2)" }}>
-                        {story.description}
-                      </p>
                     </div>
                   </div>
                   <div className="mt-3 flex items-center justify-between">
-                    <div className="text-xs" style={{ color: "var(--text-3)" }}>
-                      Your share:{" "}
-                      <span className="font-semibold" style={{ color: "#10b981" }}>50%</span>{" "}
-                      of trading fees
-                    </div>
-                    <Link
-                      href={`/tokenize/${story.id}?sponsor=1`}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors"
-                      style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
-                    >
-                      <Zap className="w-3 h-3" /> Sponsor &amp; tokenize
+                    <span className="text-xs" style={{ color: "var(--text-3)" }}>
+                      Your share: <span className="font-semibold" style={{ color: "#10b981" }}>50%</span> of trading fees
+                    </span>
+                    <Link href={`/tokenize/${story.id}?sponsor=1`}
+                      className="btn-gold flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold">
+                      <Zap className="w-3 h-3" /> Sponsor
                     </Link>
                   </div>
                 </div>

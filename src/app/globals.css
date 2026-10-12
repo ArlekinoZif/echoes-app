@@ -1,18 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --bg:           #FAF8F0;
-  --surface-1:    rgba(255,255,255,0.75);
-  --surface-2:    rgba(255,255,255,0.5);
-  --surface-3:    rgba(0,0,0,0.03);
-  --border:       rgba(0,0,0,0.07);
-  --border-hover: rgba(0,0,0,0.14);
-  --text-1:       #111111;
-  --text-2:       #666666;
-  --text-3:       #aaaaaa;
-  --amber:        #f59e0b;
-  --amber-dim:    rgba(245,158,11,0.12);
-  --holo: linear-gradient(135deg, #00c6be 0%, #ff6b9d 30%, #c77dff 60%, #ffbe0b 80%, #00c6be 100%);
+  /* ── Colosseum mono palette ── */
+  --bg:           #0c0c0c;
+  --bg-2:         #111111;
+  --bg-3:         #161616;
+  --surface-1:    #141414;
+  --surface-2:    #1a1a1a;
+  --surface-3:    #0f0f0f;
+  --border:       rgba(255,255,255,0.09);
+  --border-hover: rgba(255,255,255,0.18);
+
+  --text-1:  #ededed;
+  --text-2:  #888888;
+  --text-3:  #444444;
+
+  /* accent — single muted white-gold, used sparingly */
+  --amber:     #c8a84b;
+  --amber-dim: rgba(200,168,75,0.10);
+
+  --holo: linear-gradient(135deg, #ededed 0%, #888888 50%, #ededed 100%);
 }
 
 * { box-sizing: border-box; }
@@ -26,59 +33,42 @@ body {
   min-height: 100%;
 }
 
-/* ── Petrol / oil-slick overlay (fixed, behind everything) ── */
+/* ── Subtle grain texture (Colosseum feel) ── */
 body::before {
   content: '';
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  opacity: 0.3;
-  background:
-    radial-gradient(ellipse 120% 80% at 15% 20%,  #a8edea 0%, transparent 55%),
-    radial-gradient(ellipse 100% 70% at 85% 10%,  #f7f5a3 0%, transparent 50%),
-    radial-gradient(ellipse 90%  90% at 75% 75%,  #fed6e3 0%, transparent 55%),
-    radial-gradient(ellipse 80%  60% at 30% 85%,  #c3b1e1 0%, transparent 50%),
-    radial-gradient(ellipse 60%  50% at 60% 40%,  #a8edea 0%, transparent 45%),
-    conic-gradient(from 30deg at 50% 50%,
-      #a8edea44, #fed6e344, #f7f5a344,
-      #c3b1e144, #a8edea44, #fed6e344,
-      #a8edea44
-    );
-  filter: blur(48px) saturate(1.4);
-  animation: petrol-drift 18s ease-in-out infinite alternate;
+  opacity: 0.025;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  background-repeat: repeat;
 }
-
-@keyframes petrol-drift {
-  0%   { transform: scale(1)   rotate(0deg)  translate(0px, 0px); }
-  33%  { transform: scale(1.05) rotate(2deg)  translate(8px, -5px); }
-  66%  { transform: scale(0.97) rotate(-1deg) translate(-6px, 8px); }
-  100% { transform: scale(1.03) rotate(3deg)  translate(4px, -3px); }
-}
-
-/* All content sits above the petrol layer */
-body > * { position: relative; z-index: 1; }
 
 /* ── Scrollbar ────────────────────────────────────── */
-::-webkit-scrollbar { width: 0; height: 0; }
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
 .scrollbar-none { scrollbar-width: none; }
+.scrollbar-none::-webkit-scrollbar { display: none; }
 
-/* ── Glitch animation ─────────────────────────────── */
+/* ── Glitch text animation ─────────────────────────────── */
 @keyframes glitch {
   0%, 88%, 100% {
     text-shadow: none;
     transform: translate(0);
   }
   90% {
-    text-shadow: -3px 0 #00c6be, 3px 0 #ff6b9d;
+    text-shadow: -2px 0 rgba(255,255,255,0.4), 2px 0 rgba(255,255,255,0.2);
     transform: translate(-2px, 0);
   }
   92% {
-    text-shadow: 3px 0 #c77dff, -3px 0 #ffbe0b;
+    text-shadow: 2px 0 rgba(200,168,75,0.5), -2px 0 rgba(255,255,255,0.3);
     transform: translate(2px, 0);
   }
   94% {
-    text-shadow: -2px 0 #00c6be, 2px 0 #ff6b9d;
+    text-shadow: -1px 0 rgba(255,255,255,0.3), 1px 0 rgba(255,255,255,0.2);
     transform: translate(0, -1px);
   }
   96% {
@@ -87,9 +77,9 @@ body > * { position: relative; z-index: 1; }
   }
 }
 
-.glitch { animation: glitch 5s ease-in-out infinite; }
+.glitch { animation: glitch 7s ease-in-out infinite; }
 
-/* ── Holographic text (saturated for light bg) ────── */
+/* ── Holographic text — monochrome version ──────────────── */
 @keyframes holo-shift {
   0%   { background-position: 0% 50%; }
   50%  { background-position: 100% 50%; }
@@ -97,19 +87,294 @@ body > * { position: relative; z-index: 1; }
 }
 
 .holo-text {
-  background: linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff, #ffbe0b, #00c6be);
+  background: linear-gradient(135deg, #ffffff, #888888, #ffffff, #c8a84b, #ffffff);
   background-size: 300% 300%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: holo-shift 8s ease infinite;
+  animation: holo-shift 10s ease infinite;
 }
 
-/* ── Glass card ───────────────────────────────────── */
+/* ── Glass card — Colosseum style ──────────────────────── */
 .glass {
-  background: rgba(255,255,255,0.6);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255,255,255,0.8);
-  box-shadow: 0 2px 16px rgba(0,0,0,0.06);
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset;
 }
+
+.glass-heavy {
+  background: var(--bg-3);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 48px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06);
+}
+
+/* ── Glitch image ───────────────────────────────────── */
+@keyframes glitch-img {
+  0%,88%,100% { clip-path: none; transform: translate(0) scaleX(-1); }
+  90% { clip-path: polygon(0 15%, 100% 15%, 100% 30%, 0 30%); transform: translate(-4px, 0) scaleX(-1); }
+  92% { clip-path: polygon(0 55%, 100% 55%, 100% 70%, 0 70%); transform: translate(4px, 0) scaleX(-1); }
+  94% { clip-path: polygon(0 35%, 100% 35%, 100% 50%, 0 50%); transform: translate(-2px, 0) scaleX(-1); }
+  96% { clip-path: none; transform: translate(2px, 1px) scaleX(-1); }
+}
+
+.bust-left { animation: glitch-img 8s ease-in-out infinite; }
+
+@keyframes glitch-img-r {
+  0%,88%,100% { clip-path: none; transform: translate(0); }
+  90% { clip-path: polygon(0 20%, 100% 20%, 100% 38%, 0 38%); transform: translate(4px, 0); }
+  92% { clip-path: polygon(0 60%, 100% 60%, 100% 75%, 0 75%); transform: translate(-4px, 0); }
+  94% { clip-path: polygon(0 40%, 100% 40%, 100% 55%, 0 55%); transform: translate(2px, 0); }
+  96% { clip-path: none; transform: translate(-2px, 1px); }
+}
+
+.bust-right { animation: glitch-img-r 9s ease-in-out infinite; }
+
+/* ── Glow — muted mono ──────────────────────────────── */
+.glow-white { box-shadow: 0 0 16px rgba(255,255,255,0.08), 0 0 40px rgba(255,255,255,0.03); }
+.glow-amber { box-shadow: 0 0 16px rgba(200,168,75,0.2),  0 0 40px rgba(200,168,75,0.06); }
+
+/* ── Pulse recording ─────────────────────────────────── */
+@keyframes pulse-record {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,255,255,0.25); }
+  50% { box-shadow: 0 0 0 14px rgba(255,255,255,0); }
+}
+.pulse-record { animation: pulse-record 1.4s ease-out infinite; }
+
+/* ── Scan line overlay ────────────────────────────────── */
+.scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.04) 2px,
+    rgba(0,0,0,0.04) 4px
+  );
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* ── Colosseum primary button (legacy alias → gold) ────── */
+.btn-primary {
+  background: linear-gradient(135deg, #c8a84b, #f0d080, #c8a84b, #a07830, #c8a84b);
+  background-size: 300% 300%;
+  animation: gold-shift 5s ease infinite;
+  color: #0c0c0c;
+  border: none;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  transition: opacity 0.15s;
+}
+.btn-primary:hover { opacity: 0.88; }
+.btn-primary:active { opacity: 0.75; }
+
+.btn-outline {
+  background: transparent;
+  color: var(--text-1);
+  border: 1px solid var(--border);
+  font-weight: 600;
+  transition: border-color 0.15s, background 0.15s;
+}
+.btn-outline:hover { border-color: var(--border-hover); background: rgba(255,255,255,0.03); }
+
+/* ── Gold gradient button (Colosseum accent) ─────────── */
+@keyframes gold-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.btn-gold {
+  background: linear-gradient(135deg, #c8a84b, #f0d080, #c8a84b, #a07830, #c8a84b);
+  background-size: 300% 300%;
+  animation: gold-shift 5s ease infinite;
+  color: #0c0c0c;
+  font-weight: 700;
+  border: none;
+  letter-spacing: 0.01em;
+  transition: opacity 0.15s, transform 0.1s;
+}
+.btn-gold:hover  { opacity: 0.9; }
+.btn-gold:active { opacity: 0.75; transform: scale(0.98); }
+.btn-gold:disabled { opacity: 0.4; animation: none; background: #c8a84b; }
+
+/* ════════════════════════════════════════════════
+   DECORATIVE BUSTS — fixed corners, always visible
+   ════════════════════════════════════════════════ */
+.bust-left,
+.bust-right {
+  position: fixed;
+  bottom: 0;
+  pointer-events: none;
+  /* z-index: 1 — sits above body bg, BELOW content (z-index 2+) */
+  z-index: 1;
+  opacity: 0.07;
+  filter: saturate(0) contrast(1.2) invert(1);
+}
+
+.bust-left  { left: -20px;  width: 200px; animation: glitch-img   8s ease-in-out infinite; }
+.bust-right { right: -20px; width: 200px; animation: glitch-img-r 9s ease-in-out infinite; }
+
+@media (min-width: 768px) {
+  .bust-left  { left: 0;    width: 260px; opacity: 0.08; }
+  .bust-right { right: 0;   width: 260px; opacity: 0.08; }
+}
+
+@media (min-width: 1024px) {
+  /* on desktop sidebar is 240px wide, bust-left lives inside it */
+  .bust-left  { left: 0;    width: 340px; opacity: 0.09; }
+  .bust-right { right: 0;   width: 340px; opacity: 0.09; }
+}
+
+@media (min-width: 1440px) {
+  .bust-left  { left: 0;    width: 420px; opacity: 0.10; }
+  .bust-right { right: 0;   width: 420px; opacity: 0.10; }
+}
+
+/* ── Buddha — fixed center background, desktop only ── */
+.buddha-bg {
+  display: none !important; /* hidden on mobile — overridden below */
+}
+
+@media (min-width: 1024px) {
+  .buddha-bg {
+    display: block !important;
+    position: fixed !important;
+    top: 50% !important;
+    /* sits inside the main content area, past sidebar */
+    left: calc(50% + 120px) !important;
+    transform: translate(-50%, -50%) !important;
+    pointer-events: none !important;
+    z-index: 1 !important;   /* above grain (0), below app-shell content (2) */
+    width: 500px !important;
+    height: auto !important;
+    opacity: 0.05 !important;
+    filter: saturate(0) contrast(1.4) invert(1) blur(1.5px) !important;
+    animation: glitch-img-r 14s ease-in-out infinite;
+  }
+}
+
+@media (min-width: 1440px) {
+  .buddha-bg {
+    width: 620px !important;
+    opacity: 0.055 !important;
+    left: calc(50% + 140px) !important;
+  }
+}
+
+/* ── Decorative grid lines (Colosseum columns) ── */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background-image:
+    linear-gradient(90deg, rgba(255,255,255,0.016) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(255,255,255,0.010) 1px, transparent 1px);
+  background-size: 80px 120px;
+  mask-image: radial-gradient(ellipse 90% 90% at 50% 50%, black 20%, transparent 100%);
+}
+
+/* ════════════════════════════════════════════════
+   APP SHELL — desktop sidebar + mobile bottom nav
+   ════════════════════════════════════════════════ */
+
+/* All app content sits at z-index 2 — above busts (1) and grain (0) */
+.app-shell {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Mobile: padded for fixed top header + bottom nav */
+.app-main {
+  flex: 1;
+  padding-top: 56px;
+  padding-bottom: 96px;
+}
+
+/* Standalone PWA / Seeker TWA: respect notch + gesture-bar safe areas.
+   No-op (insets = 0) in a normal non-edge-to-edge TWA, but keeps a browser
+   PWA on a notched device from tucking the nav under the gesture bar. */
+@supports (padding: env(safe-area-inset-bottom)) {
+  @media (max-width: 1023px) {
+    .app-main {
+      padding-top: calc(56px + env(safe-area-inset-top));
+      padding-bottom: calc(96px + env(safe-area-inset-bottom));
+    }
+  }
+}
+
+/* ── Desktop ≥ 1024px: sidebar layout ── */
+@media (min-width: 1024px) {
+  .app-shell {
+    flex-direction: row;
+  }
+
+  .app-main {
+    margin-left: 240px;
+    padding-top: 0;
+    padding-bottom: 0;
+    flex: 1;
+    min-height: 100vh;
+  }
+}
+
+@media (min-width: 1440px) {
+  .app-main {
+    margin-left: 260px;
+  }
+}
+
+/* ════════════════════════════════════════════════
+   POLISH — focus, inputs, selection, motion
+   ════════════════════════════════════════════════ */
+
+/* Text selection — gold tint instead of default blue */
+::selection {
+  background: rgba(200,168,75,0.28);
+  color: #ededed;
+}
+
+/* Inputs / textareas: smooth focus ring in amber, no jarring outline removal */
+input, textarea, select {
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: rgba(200,168,75,0.45) !important;
+  box-shadow: 0 0 0 3px rgba(200,168,75,0.10);
+}
+input::placeholder, textarea::placeholder { color: var(--text-3); }
+
+/* Keyboard focus visibility for buttons/links (mouse clicks stay clean) */
+button:focus-visible, a:focus-visible {
+  outline: 2px solid rgba(200,168,75,0.5);
+  outline-offset: 2px;
+}
+
+/* Glass cards: subtle lift on hover when interactive */
+a .glass, button .glass, .glass-interactive {
+  transition: border-color 0.18s ease, transform 0.18s ease, box-shadow 0.18s ease;
+}
+.glass-interactive:hover {
+  border-color: var(--border-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 28px rgba(0,0,0,0.45);
+}
+
+/* Respect reduced-motion: kill decorative animations */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+/* Disabled state consistency */
+button:disabled { cursor: not-allowed; }

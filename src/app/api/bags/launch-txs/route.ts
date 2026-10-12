@@ -9,12 +9,16 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import bs58 from "bs58";
+import { fetchWithTimeout } from "@/lib/fetch-timeout";
+import { AuthenticationError, assertOwnIdentity, authErrorResponse, requireUser } from "@/lib/auth-server";
 
 const BAGS_API_URL =
   process.env.BAGS_API_URL ?? "https://public-api-v2.bags.fm/api/v1";
 const BAGS_API_KEY = process.env.BAGS_API_KEY ?? "";
 
 export async function POST(req: NextRequest) {
+  let userId: string;
+  try { userId = await requireUser(req); } catch (error) { return authErrorResponse(error); }
   try {
     const {
       tokenMint,
@@ -30,8 +34,12 @@ export async function POST(req: NextRequest) {
         { status: 400 }
       );
     }
+    assertOwnIdentity(userId, wallet);
+    if (!BAGS_API_KEY) {
+      return NextResponse.json({ error: "Token launch is not configured" }, { status: 503 });
+    }
 
-    const res = await fetch(
+    const res = await fetchWithTimeout(
       `${BAGS_API_URL}/token-launch/create-launch-transaction`,
       {
         method: "POST",
@@ -80,6 +88,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ transaction: txBase64 });
   } catch (err) {
+    if (err instanceof AuthenticationError) return authErrorResponse(err);
     const msg = err instanceof Error ? err.message : String(err);
     console.error("bags/launch-txs error:", msg);
     return NextResponse.json({ error: `bags/launch-txs: ${msg}` }, { status: 500 });

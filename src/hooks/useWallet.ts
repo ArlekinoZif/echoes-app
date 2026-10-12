@@ -1,76 +1,130 @@
 "use client";
 
-import { usePrivy, useActiveWallet } from "@privy-io/react-auth";
-import { useWallets as useSolanaWallets, useCreateWallet } from "@privy-io/react-auth/solana";
-import { Transaction, Connection } from "@solana/web3.js";
+import { useSolana } from "@phantom/react-sdk";
+import { useHeliusWallet } from "helius-wallet-kit";
+import { Buffer } from "buffer";
+import { Connection, Transaction, VersionedTransaction } from "@solana/web3.js";
+import { useAuth } from "@/providers/AuthProvider";
+import { getRpcUrl } from "@/lib/rpcUrl";
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
+type SolanaTransaction = Transaction | VersionedTransaction;
+
+function deserializeTransaction(base64: string): SolanaTransaction {
+  const bytes = Uint8Array.from(Buffer.from(base64, "base64"));
+  try {
+    return VersionedTransaction.deserialize(bytes);
+  } catch {
+    return Transaction.from(bytes);
+  }
+}
+
+function serializeTransaction(transaction: SolanaTransaction) {
+  return transaction instanceof VersionedTransaction
+    ? transaction.serialize()
+    : transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
+}
+
+async function confirmSignature(connection: Connection, signature: string, timeoutMs = 60_000) {
+  const startedAt = Date.now();
+  while (Date.now() - startedAt < timeoutMs) {
+    const { value } = await connection.getSignatureStatuses([signature]);
+    const status = value[0];
+    if (status?.err) throw new Error("Transaction failed on-chain. Check Solscan.");
+    if (status?.confirmationStatus === "confirmed" || status?.confirmationStatus === "finalized") return;
+    await new Promise((resolve) => window.setTimeout(resolve, 1_500));
+  }
+  throw new Error("Not confirmed in time — check Solscan for the signature.");
+}
 
 export function useWallet() {
-  const { ready, authenticated, login, logout } = usePrivy();
-  const { wallet: activeWallet, setActiveWallet } = useActiveWallet();
-  const { wallets } = useSolanaWallets();
-  const { createWallet } = useCreateWallet();
+  const auth = useAuth();
+  const helius = useHeliusWallet();
+  const { solana } = useSolana();
+  const connection = helius.connection ?? new Connection(getRpcUrl(), "confirmed");
 
-  // Use the active wallet Privy has designated, matched against Solana wallets.
-  // Only fall back to wallets[0] when no active wallet is set at all — never
-  // auto-switch to a different wallet if the user already has one selected.
-  const activeAddress = (activeWallet as { address?: string } | undefined)?.address;
-  const solanaWallet = activeAddress
-    ? (wallets.find((w) => w.address === activeAddress) ?? null)
-    : (wallets[0] ?? null);
-  const address = solanaWallet?.address ?? null;
-
-  async function connect(): Promise<string> {
-    if (!authenticated) {
-      await login();
-      return address ?? "";
-    }
-    if (!address) {
-      try { await createWallet(); } catch { /* already exists */ }
-    }
-    return address ?? "";
+  function requireAddress() {
+    if (!auth.address) throw new Error("Connect a wallet to continue.");
+    return auth.address;
   }
 
-  async function signTransaction(tx: Transaction): Promise<Transaction> {
-    if (!solanaWallet) throw new Error("No Solana wallet connected");
-    const serialized = tx.serialize({ requireAllSignatures: false, verifySignatures: false });
-    const { signedTransaction } = await (solanaWallet as unknown as {
-      signTransaction(input: { transaction: Uint8Array }): Promise<{ signedTransaction: Uint8Array }>;
-    }).signTransaction({ transaction: serialized });
-    return Transaction.from(Buffer.from(signedTransaction));
+  async function connect() {
+    if (auth.authenticated && auth.address) return auth.address;
+    return (await auth.login()) ?? "";
   }
 
-  async function signAllTransactions(txs: Transaction[]): Promise<Transaction[]> {
-    return Promise.all(txs.map((tx) => signTransaction(tx)));
-  }
-
-  async function signAndSendAllBase64Txs(base64Txs: string[]): Promise<string[]> {
-    if (!solanaWallet) throw new Error("No Solana wallet connected");
-    const connection = new Connection(RPC_URL, "confirmed");
-    const sigs: string[] = [];
-    for (const b64 of base64Txs) {
-      const txBytes = Buffer.from(b64, "base64");
-      const { signedTransaction } = await (solanaWallet as unknown as {
-        signTransaction(input: { transaction: Uint8Array }): Promise<{ signedTransaction: Uint8Array }>;
-      }).signTransaction({ transaction: txBytes });
-      const sig = await connection.sendRawTransaction(Buffer.from(signedTransaction));
-      await connection.confirmTransaction(sig, "confirmed");
-      sigs.push(sig);
+  async function signTransaction(transaction: Transaction): Promise<Transaction> {
+    requireAddress();
+    if (auth.provider === "external") {
+      const signed = await solana.signTransaction(transaction);
+      if (!(signed instanceof Transaction)) {
+        throw new Error("Wallet returned an unexpected transaction format.");
+      }
+      return signed;
     }
-    return sigs;
+    if (helius.status !== "authenticated") {
+      throw new Error("Reconnect your Helius wallet, then try again.");
+    }
+    return Transaction.from(await helius.signTransaction(serializeTransaction(transaction)));
+  }
+
+  async function signAllTransactions(transactions: Transaction[]) {
+    if (auth.provider === "external") {
+      const signed = await solana.signAllTransactions(transactions);
+      if (!signed.every((transaction) => transaction instanceof Transaction)) {
+        throw new Error("Wallet returned an unexpected transaction format.");
+      }
+      return signed as Transaction[];
+    }
+    return Promise.all(transactions.map(signTransaction));
+  }
+
+  async function signAndSendAllBase64Txs(base64Transactions: string[]) {
+    requireAddress();
+    const signatures: string[] = [];
+    for (const encoded of base64Transactions) {
+      const transaction = deserializeTransaction(encoded);
+      let signature: string;
+      if (auth.provider === "external") {
+        const signed = await solana.signTransaction(transaction);
+        signature = await connection.sendRawTransaction(serializeTransaction(signed), {
+          skipPreflight: false,
+        });
+      } else {
+        if (helius.status !== "authenticated") {
+          throw new Error("Reconnect your Helius wallet, then try again.");
+        }
+        signature = await helius.signAndSendTransaction(serializeTransaction(transaction));
+      }
+      await confirmSignature(connection, signature);
+      signatures.push(signature);
+    }
+    return signatures;
+  }
+
+  async function signMessage(message: string) {
+    requireAddress();
+    if (auth.provider === "external") {
+      const result = await solana.signMessage(message);
+      return Buffer.from(result.signature).toString("base64");
+    }
+    if (helius.status !== "authenticated") {
+      throw new Error("Reconnect your Helius wallet, then try again.");
+    }
+    const signatureHex = await helius.signMessage(message);
+    return Buffer.from(signatureHex, "hex").toString("base64");
   }
 
   return {
-    ready,
-    authenticated,
-    address,
+    ready: auth.ready,
+    authenticated: auth.authenticated,
+    address: auth.address,
+    provider: auth.provider,
     connect,
-    logout,
+    logout: auth.logout,
+    switchWallet: auth.switchWallet,
     signTransaction,
     signAllTransactions,
     signAndSendAllBase64Txs,
-    setActiveWallet,
+    signMessage,
   };
 }

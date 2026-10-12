@@ -1,80 +1,37 @@
 "use client";
 
+import { authenticatedFetch } from "./authenticated-fetch";
+
 export interface UploadResult {
   url: string;
   key: string;
 }
 
+async function uploadToR2(file: Blob | File, filename: string, contentType: string): Promise<UploadResult> {
+  const res = await authenticatedFetch("/api/upload", {
+    method: "POST",
+    headers: {
+      "x-filename": filename,
+      "x-content-type": contentType,
+    },
+    body: file,
+  });
+
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ error: res.statusText }));
+    throw new Error((err as { error: string }).error ?? "Upload failed");
+  }
+
+  return res.json() as Promise<UploadResult>;
+}
+
 export async function uploadImageToR2(file: File): Promise<UploadResult> {
   const ext = file.name.split(".").pop() ?? "jpg";
   const filename = `cover-${Date.now()}.${ext}`;
-
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, contentType: file.type || "image/jpeg" }),
-  });
-
-  if (!res.ok) throw new Error("Failed to get upload URL");
-
-  const { presignedUrl, key } = await res.json();
-
-  const imageController = new AbortController();
-  const imageTimeout = setTimeout(() => imageController.abort(), 30_000);
-  let uploadRes: Response;
-  try {
-    uploadRes = await fetch(presignedUrl, {
-      method: "PUT",
-      headers: { "Content-Type": file.type || "image/jpeg" },
-      body: file,
-      signal: imageController.signal,
-    });
-  } finally {
-    clearTimeout(imageTimeout);
-  }
-
-  if (!uploadRes.ok) throw new Error("Image upload to R2 failed");
-
-  const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
-  const url = publicBase ? `${publicBase}/${key}` : URL.createObjectURL(file);
-
-  return { url, key };
+  return uploadToR2(file, filename, file.type || "image/jpeg");
 }
 
 export async function uploadAudioToR2(blob: Blob): Promise<UploadResult> {
   const filename = `recording-${Date.now()}.webm`;
-
-  // Get presigned URL from our API
-  const res = await fetch("/api/upload", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ filename, contentType: blob.type || "audio/webm" }),
-  });
-
-  if (!res.ok) throw new Error("Failed to get upload URL");
-
-  const { presignedUrl, key } = await res.json();
-
-  // Upload directly to R2
-  const audioController = new AbortController();
-  const audioTimeout = setTimeout(() => audioController.abort(), 30_000);
-  let uploadRes: Response;
-  try {
-    uploadRes = await fetch(presignedUrl, {
-      method: "PUT",
-      headers: { "Content-Type": blob.type || "audio/webm" },
-      body: blob,
-      signal: audioController.signal,
-    });
-  } finally {
-    clearTimeout(audioTimeout);
-  }
-
-  if (!uploadRes.ok) throw new Error("Upload to R2 failed");
-
-  // Public URL via R2 public bucket domain
-  const publicBase = process.env.NEXT_PUBLIC_R2_PUBLIC_URL ?? "";
-  const url = publicBase ? `${publicBase}/${key}` : URL.createObjectURL(blob);
-
-  return { url, key };
+  return uploadToR2(blob, filename, blob.type || "audio/webm");
 }

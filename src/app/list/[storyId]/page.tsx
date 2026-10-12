@@ -11,8 +11,8 @@ import {
   ArrowLeft, Wallet, DollarSign, CheckCircle, Loader2, ExternalLink, Copy,
 } from "lucide-react";
 
-const RPC_URL =
-  process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.mainnet-beta.solana.com";
+import { getRpcUrl } from "@/lib/rpcUrl";
+const RPC_URL = getRpcUrl();
 
 type Step = "wallet" | "pay" | "done";
 
@@ -35,7 +35,7 @@ export default function ListPage({
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    fetchStory(storyId).then((s) => {
+    fetchStory(storyId).then((s: Story | null) => {
       if (!s) { router.push("/"); return; }
       if (s.status === "listed" || s.status === "tokenized") {
         setStory(s);
@@ -103,14 +103,14 @@ export default function ListPage({
   if (!story) return null;
 
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg)" }}>
+    <div className="min-h-screen">
       <div className="max-w-xl mx-auto px-4 py-10">
         {/* Header */}
         <div className="flex items-center gap-4 mb-10">
           <Link
             href="/"
             className="p-2 rounded-full transition-colors"
-            style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.07)", color: "var(--text-2)" }}
+            style={{ background: "rgba(20,20,20,0.95)", border: "1px solid rgba(255,255,255,0.08)", color: "var(--text-2)" }}
           >
             <ArrowLeft className="w-5 h-5" />
           </Link>
@@ -163,8 +163,7 @@ export default function ListPage({
             <button
               onClick={handleConnect}
               disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+              className="btn-gold w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -197,7 +196,7 @@ export default function ListPage({
               </div>
               <div
                 className="flex justify-between text-sm pt-3 mt-3"
-                style={{ borderTop: "1px solid rgba(0,0,0,0.07)" }}
+                style={{ borderTop: "1px solid rgba(255,255,255,0.08)" }}
               >
                 <span style={{ color: "var(--text-3)" }}>From</span>
                 <span className="font-mono text-xs" style={{ color: "var(--text-2)" }}>
@@ -230,7 +229,7 @@ export default function ListPage({
                 {/* Wallet address row */}
                 <div
                   className="flex items-center gap-2 p-3 rounded-xl"
-                  style={{ background: "rgba(255,255,255,0.7)", border: "1px solid rgba(0,0,0,0.07)" }}
+                  style={{ background: "rgba(20,20,20,0.95)", border: "1px solid rgba(255,255,255,0.08)" }}
                 >
                   <span className="flex-1 font-mono text-xs truncate" style={{ color: "var(--text-2)" }}>
                     {address}
@@ -240,8 +239,8 @@ export default function ListPage({
                     className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium flex-shrink-0 transition-colors"
                     style={
                       copied
-                        ? { background: "rgba(255,107,157,0.15)", color: "#ff6b9d" }
-                        : { background: "rgba(0,0,0,0.05)", color: "var(--text-2)" }
+                        ? { background: "rgba(200,168,75,0.15)", color: "var(--amber)" }
+                        : { background: "rgba(255,255,255,0.05)", color: "var(--text-2)" }
                     }
                   >
                     <Copy className="w-3 h-3" />
@@ -253,8 +252,7 @@ export default function ListPage({
                   href="https://bags.fm/?ref=echoesfans"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80"
-                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                  className="btn-gold flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-80"
                 >
                   <ExternalLink className="w-3 h-3" /> Get $ECHOES on Bags App
                 </a>
@@ -264,8 +262,7 @@ export default function ListPage({
             <button
               onClick={handlePay}
               disabled={loading}
-              className="w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
-              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+              className="btn-gold w-full py-3 rounded-xl font-semibold transition-colors disabled:opacity-50"
             >
               {loading ? (
                 <span className="flex items-center justify-center gap-2">
@@ -313,7 +310,7 @@ export default function ListPage({
               <Link
                 href={`/tokenize/${storyId}`}
                 className="flex items-center justify-center gap-2 w-full py-2.5 rounded-xl text-sm font-semibold transition-colors"
-                style={{ background: "rgba(0,0,0,0.06)", color: "var(--text-1)", border: "1px solid rgba(0,0,0,0.07)" }}
+                style={{ background: "rgba(255,255,255,0.04)", color: "var(--text-1)", border: "1px solid rgba(255,255,255,0.08)" }}
               >
                 Tokenize on Bags App →
               </Link>
@@ -321,8 +318,7 @@ export default function ListPage({
 
             <Link
               href="/"
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold transition-colors"
-              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+              className="btn-gold flex items-center justify-center gap-2 w-full py-3 rounded-xl font-semibold transition-colors"
             >
               Back to Library
             </Link>

@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Echoes — offline</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { height: 100%; margin: 0; }
+      body {
+        background: #0c0c0c;
+        color: #ededed;
+        font-family: "Space Grotesk", system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        display: flex; align-items: center; justify-content: center;
+        text-align: center; padding: 24px;
+      }
+      .wrap { max-width: 320px; }
+      img { width: 72px; height: 72px; opacity: 0.9; margin-bottom: 20px; }
+      h1 { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; margin: 0 0 8px; }
+      p { font-size: 13px; line-height: 1.5; color: rgba(237,237,237,0.55); margin: 0 0 24px; }
+      button {
+        background: #c8a84b; color: #0c0c0c; border: 0; border-radius: 10px;
+        font-weight: 600; font-size: 14px; padding: 11px 22px; cursor: pointer;
+      }
+      button:active { transform: scale(0.97); }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <img src="/icons/icon-192.png" alt="Echoes" />
+      <h1>You're offline</h1>
+      <p>Echoes needs a connection to load stories and reach Solana. Check your network and try again.</p>
+      <button onclick="location.reload()">Retry</button>
+    </div>
+  </body>
+</html>

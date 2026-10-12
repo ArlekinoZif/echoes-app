@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { useWallet } from "@/hooks/useWallet";
 import { generateSalt, computeCommitment, saveSalt, getSalt } from "@/lib/commit-reveal";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 
 type Phase = "voting" | "reveal" | "finalized";
 
@@ -33,13 +34,12 @@ interface PoolData {
 }
 
 function useCountdown(targetTs: number) {
-  const [remaining, setRemaining] = useState(targetTs - Math.floor(Date.now() / 1000));
+  const [remaining, setRemaining] = useState(0);
   useEffect(() => {
-    const t = setInterval(
-      () => setRemaining(targetTs - Math.floor(Date.now() / 1000)),
-      1000
-    );
-    return () => clearInterval(t);
+    const update = () => setRemaining(targetTs - Math.floor(Date.now() / 1000));
+    const first = window.setTimeout(update, 0);
+    const timer = window.setInterval(update, 1000);
+    return () => { window.clearTimeout(first); window.clearInterval(timer); };
   }, [targetTs]);
   const d = Math.max(0, remaining);
   return {
@@ -66,10 +66,20 @@ export default function VotePage() {
   const [revealing, setRevealing] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // 503 means the pool backend is deliberately switched off, not a failure.
+  const [poolOffline, setPoolOffline] = useState(false);
 
   const loadPool = useCallback(async () => {
-    const res = await fetch("/api/pool");
+    const res = await authenticatedFetch("/api/pool");
     const data = await res.json();
+    if (!res.ok) {
+      setPool(null);
+      setPoolOffline(res.status === 503);
+      setError(res.status === 503 ? null : data.error ?? "Weekly voting is unavailable.");
+      setLoading(false);
+      return;
+    }
+    setPoolOffline(false);
     // Map old SKR field names → new ECHOES names for backwards compat
     if (data.skrVoteCost !== undefined) data.echoesVoteCost = data.skrVoteCost;
     if (data.entries) {
@@ -106,7 +116,7 @@ export default function VotePage() {
       const salt = generateSalt();
       const commitment = await computeCommitment(selected, address, salt);
 
-      const res = await fetch("/api/pool/vote", {
+      const res = await authenticatedFetch("/api/pool/vote", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ voter: address, commitment, echoesAmount }),
@@ -145,7 +155,7 @@ export default function VotePage() {
 
     const salt = getSalt(pool.poolId, revealedStory)!;
     try {
-      const res = await fetch("/api/pool/reveal", {
+      const res = await authenticatedFetch("/api/pool/reveal", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ voter: address, storyId: revealedStory, salt }),
@@ -168,7 +178,27 @@ export default function VotePage() {
     );
   }
 
-  if (!pool) return null;
+  if (!pool) {
+    return (
+      <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center px-6">
+        <div className="max-w-md text-center">
+          {poolOffline ? (
+            <>
+              <Trophy className="w-8 h-8 mx-auto mb-4 text-amber-500" />
+              <p className="text-lg font-semibold mb-2">Weekly voting is not open yet</p>
+              <p className="text-sm text-neutral-400 mb-5">
+                The weekly pool opens once the on-chain round is live. Keep recording
+                and listening — published stories enter the pool automatically.
+              </p>
+            </>
+          ) : (
+            <p className="text-red-400 mb-5">{error ?? "Weekly voting is unavailable."}</p>
+          )}
+          <Link href="/" className="text-amber-400 hover:underline">Return home</Link>
+        </div>
+      </div>
+    );
+  }
 
   const sortedEntries = [...pool.entries].sort(
     (a, b) => b.totalEchoesWeight - a.totalEchoesWeight
@@ -238,8 +268,7 @@ export default function VotePage() {
         {!address && (
           <button
             onClick={handleConnect}
-            className="w-full py-3 mb-6 rounded-xl font-semibold transition-opacity hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+            className="btn-gold w-full py-3 mb-6 rounded-xl font-semibold transition-opacity hover:opacity-90"
           >
             Connect wallet to bet
           </button>
@@ -247,7 +276,7 @@ export default function VotePage() {
 
         {/* Stories */}
         <div className="flex flex-col gap-3 mb-6">
-          {sortedEntries.map((entry, i) => {
+          {sortedEntries.map((entry) => {
             const isSelected = selected === entry.storyId;
             const isWinner = entry.rank > 0;
 
@@ -337,10 +366,9 @@ export default function VotePage() {
                   onClick={() => setEchoesAmount(amt)}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium transition-colors ${
                     echoesAmount === amt
-                      ? "text-white"
+                      ? "btn-gold"
                       : "bg-neutral-800 text-neutral-400 hover:bg-neutral-700"
                   }`}
-                  style={echoesAmount === amt ? { background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)" } : {}}
                 >
                   {amt}
                 </button>
@@ -349,8 +377,7 @@ export default function VotePage() {
             <button
               onClick={handleVote}
               disabled={!selected || voting}
-              className="w-full py-3 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-semibold transition-opacity hover:opacity-90"
-              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+              className="btn-gold w-full py-3 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl font-semibold transition-opacity hover:opacity-90"
             >
               {voting ? (
                 <span className="flex items-center justify-center gap-2">
@@ -379,8 +406,7 @@ export default function VotePage() {
           <button
             onClick={handleReveal}
             disabled={revealing}
-            className="w-full py-3 disabled:opacity-40 rounded-xl font-semibold transition-opacity hover:opacity-90"
-            style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+            className="btn-gold w-full py-3 disabled:opacity-40 rounded-xl font-semibold transition-opacity hover:opacity-90"
           >
             {revealing ? (
               <span className="flex items-center justify-center gap-2">

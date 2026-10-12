@@ -25,6 +25,10 @@ export interface Story {
   publishGate: PublishGate;
   createdAt: number;
   status: StoryStatus;
+  // Stable Solana wallet address of the author — the canonical owner key.
+  // Survives re-login and exists without a wallet. See useIdentity.
+  ownerId?: string;
+  // Real Solana wallet (set when connected, used for on-chain payout/sponsor).
   authorWallet?: string;
 
   // Set after listing (pay gate completes)
@@ -33,7 +37,7 @@ export interface Story {
   // Cover image (optional, uploaded at record time)
   coverImageUrl?: string;
 
-  // Author social identity (saved at record time from linked Privy accounts)
+  // Optional legacy author social identity.
   authorTwitter?: string;
 
   // Set after tokenization
@@ -43,6 +47,10 @@ export interface Story {
   launchType?: LaunchType;
   sponsorWallet?: string;
   arweaveCid?: string;
+
+  // Private audio (paywall)
+  isPrivate?: boolean;
+  priceSol?: number;
 }
 
 export interface EvaluationCriteria {

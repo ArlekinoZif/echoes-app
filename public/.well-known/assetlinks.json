@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "fans.echoes.app",
+      "sha256_cert_fingerprints": [
+        "9E:D0:8A:C4:A9:F0:68:F9:A9:D9:67:2C:13:5A:E9:82:53:64:54:6D:A9:50:E2:3D:91:80:F4:5D:02:DD:57:2E"
+      ]
+    }
+  }
+]

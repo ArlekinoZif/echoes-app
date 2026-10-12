@@ -1,10 +1,12 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { fetchMyStories } from "@/lib/db";
 import { Story } from "@/lib/types";
 import { useWallet } from "@/hooks/useWallet";
+import { useIdentity } from "@/hooks/useIdentity";
+import { authenticatedFetch } from "@/lib/authenticated-fetch";
 import {
   ArrowLeft, Wallet, Coins, TrendingUp, CheckCircle,
   Clock, ExternalLink, Loader2, RefreshCw, BarChart3,
@@ -53,19 +55,20 @@ function shortSig(sig: string): string {
 
 export default function DashboardPage() {
   const { address, connect } = useWallet();
+  const { userId } = useIdentity();
   const [data, setData] = useState<DashboardData | null>(null);
   const [stories, setStories] = useState<Story[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = useCallback(async (addr: string) => {
+  const fetchData = useCallback(async (addr: string, id: string | null) => {
     setLoading(true);
     setError(null);
     try {
       const [res, mine] = await Promise.all([
-        fetch(`/api/dashboard?address=${addr}`),
-        fetchMyStories(addr),
+        authenticatedFetch(`/api/dashboard?address=${addr}`),
+        id ? fetchMyStories(id) : Promise.resolve([] as Story[]),
       ]);
       if (!res.ok) throw new Error((await res.json()).error);
       setData(await res.json());
@@ -79,8 +82,8 @@ export default function DashboardPage() {
   }, []);
 
   useEffect(() => {
-    if (address) fetchData(address);
-  }, [address, fetchData]);
+    if (address) fetchData(address, userId);
+  }, [address, userId, fetchData]);
 
   const handleConnect = async () => {
     try {
@@ -93,7 +96,7 @@ export default function DashboardPage() {
   const handleRefresh = () => {
     if (!address) return;
     setRefreshing(true);
-    fetchData(address);
+    fetchData(address, userId);
   };
 
   const tokenizedStories = stories.filter((s) => s.status === "tokenized");
@@ -141,8 +144,7 @@ export default function DashboardPage() {
             </div>
             <button
               onClick={handleConnect}
-              className="px-6 py-3 rounded-xl font-semibold transition-opacity hover:opacity-90"
-              style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+              className="btn-gold px-6 py-3 rounded-xl font-semibold transition-opacity hover:opacity-90"
             >
               Connect wallet
             </button>
@@ -174,8 +176,7 @@ export default function DashboardPage() {
                   href="https://seeker.app"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-4 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90 flex-shrink-0"
-                  style={{ background: "linear-gradient(135deg, #00c6be, #ff6b9d, #c77dff)", color: "#fff" }}
+                  className="btn-gold px-4 py-2 rounded-xl text-xs font-semibold transition-opacity hover:opacity-90 flex-shrink-0"
                 >
                   Stake →
                 </a>
